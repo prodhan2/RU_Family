@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ru_family/ViewAllSomitiINfo.dart';
 import 'package:ru_family/somitiCreate.dart';
 
 void main() {
@@ -79,7 +80,7 @@ class SomitiPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const JoinSomitiPage(),
+                      builder: (context) => const ViewAllSomitiPage(),
                     ),
                   );
                 },
@@ -141,28 +142,6 @@ class GreenButton extends StatelessWidget {
 }
 
 // ==================== Demo Pages ====================
-
-class JoinSomitiPage extends StatelessWidget {
-  const JoinSomitiPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('সমিতিতে যোগদান করুন'),
-        backgroundColor: Colors.green,
-      ),
-      body: const Center(
-        child: Text(
-          'এখানে সমিতিতে যোগদানের ফর্ম/লজিক থাকবে।',
-          style: TextStyle(fontSize: 18),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-}
-
 class EnterSomitiPage extends StatelessWidget {
   const EnterSomitiPage({super.key});
 
