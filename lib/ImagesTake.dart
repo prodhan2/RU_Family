@@ -15,13 +15,96 @@ class AddImageGalleryPage extends StatefulWidget {
 
 class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
   final TextEditingController _urlsController = TextEditingController();
+  final TextEditingController _folderController = TextEditingController();
   bool _uploading = false;
   final List<String> _previewUrls = [];
+  List<String> _existingFolders = [];
+  String? _selectedFolder;
+
+  // User info from members collection
+  String _uploadedByName = 'Loading...';
+  String _uploadedByEmail = '';
 
   @override
   void initState() {
     super.initState();
     _urlsController.addListener(_updatePreview);
+    _loadExistingFolders();
+    _loadCurrentUserName(); // NEW: Load name from members
+  }
+
+  // ==================== LOAD USER NAME FROM members ====================
+  Future<void> _loadCurrentUserName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('members')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        final name = data['name']?.toString() ?? 'Unknown User';
+        final email = data['email']?.toString() ?? user.email ?? '';
+
+        if (mounted) {
+          setState(() {
+            _uploadedByName = name;
+            _uploadedByEmail = email;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _uploadedByName = user.displayName ?? 'User';
+            _uploadedByEmail = user.email ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _uploadedByName = user.displayName ?? 'User';
+          _uploadedByEmail = user.email ?? '';
+        });
+      }
+    }
+  }
+
+  // ==================== LOAD EXISTING FOLDERS ====================
+  Future<void> _loadExistingFolders() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('images')
+          .where('somitiName', isEqualTo: widget.somitiName)
+          .get();
+
+      final Set<String> folders = {};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['folder'] != null && data['folder'] is String) {
+          folders.add(data['folder'] as String);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _existingFolders = folders.toList()..sort();
+          if (_existingFolders.isNotEmpty && _selectedFolder == null) {
+            _selectedFolder = _existingFolders.first;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _existingFolders = [];
+        });
+      }
+    }
   }
 
   void _updatePreview() {
@@ -38,6 +121,47 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
     });
   }
 
+  void _showCreateFolderDialog() {
+    _folderController.clear();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Create New Folder'),
+        content: TextField(
+          controller: _folderController,
+          decoration: const InputDecoration(
+            labelText: 'Folder Name',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = _folderController.text.trim();
+              if (name.isNotEmpty) {
+                setState(() {
+                  _selectedFolder = name;
+                  if (!_existingFolders.contains(name)) {
+                    _existingFolders.add(name);
+                    _existingFolders.sort();
+                  }
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== UPLOAD WITH CORRECT NAME ====================
   Future<void> _uploadAsArray() async {
     final rawText = _urlsController.text;
     final urls = rawText
@@ -55,28 +179,37 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
       return;
     }
 
+    if (_selectedFolder == null || _selectedFolder!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select or create a folder')),
+      );
+      return;
+    }
+
     setState(() => _uploading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
       final docRef = FirebaseFirestore.instance.collection('images').doc();
 
       await docRef.set({
-        'imageUrls': urls, // Array of strings
+        'imageUrls': urls,
         'somitiName': widget.somitiName,
-        'uploadedByEmail': user.email ?? '',
-        'uploadedByName': user.displayName ?? 'User',
+        'folder': _selectedFolder,
+        'uploadedByEmail': _uploadedByEmail,
+        'uploadedByName': _uploadedByName, // CORRECT NAME FROM members
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${urls.length} image(s) uploaded as array!'),
+          content: Text(
+            '${urls.length} image(s) uploaded by $_uploadedByName!',
+          ),
           backgroundColor: Colors.green,
         ),
       );
 
-      Navigator.pop(context, true); // Refresh gallery
+      Navigator.pop(context, true);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -100,8 +233,19 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Multiple Images (Array)'),
+        title: const Text('Add Multiple Images'),
         backgroundColor: Colors.orange,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                'By: $_uploadedByName',
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -129,7 +273,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                       '1. Go to postimages.org\n'
                       '2. Upload all images\n'
                       '3. Copy Direct Links (one per line)\n'
-                      '4. Paste below → All saved in one record',
+                      '4. Paste below → Saved in one record',
                       style: TextStyle(fontSize: 14),
                     ),
                     const SizedBox(height: 12),
@@ -147,7 +291,71 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
             ),
             const SizedBox(height: 20),
 
-            // Dynamic Text Field
+            // Folder Selection
+            Card(
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select or Create Folder',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _selectedFolder,
+                      decoration: InputDecoration(
+                        labelText: 'Folder',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      items: [
+                        ..._existingFolders.map(
+                          (folder) => DropdownMenuItem(
+                            value: folder,
+                            child: Text(folder),
+                          ),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'new',
+                          child: Row(
+                            children: [
+                              Icon(Icons.add, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Create New Folder'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == 'new') {
+                          _showCreateFolderDialog();
+                        } else {
+                          setState(() => _selectedFolder = value);
+                        }
+                      },
+                    ),
+                    if (_existingFolders.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'No folders yet. Create one!',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // URL Input
             Expanded(
               child: TextField(
                 controller: _urlsController,
@@ -157,8 +365,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                 decoration: InputDecoration(
                   labelText: 'Paste Image URLs (one per line)',
                   hintText:
-                      'https://i.postimg.cc/.../img1.png\n'
-                      'https://i.postimg.cc/.../img2.png',
+                      'https://i.postimg.cc/.../img1.png\nhttps://i.postimg.cc/.../img2.png',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -170,7 +377,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
             ),
             const SizedBox(height: 16),
 
-            // Live Preview
+            // Preview
             if (_previewUrls.isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,7 +463,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                         ],
                       )
                     : Text(
-                        'Save ${_previewUrls.length} Images as Array',
+                        'Save ${_previewUrls.length} Images',
                         style: const TextStyle(fontSize: 16),
                       ),
               ),
@@ -271,6 +478,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
   void dispose() {
     _urlsController.removeListener(_updatePreview);
     _urlsController.dispose();
+    _folderController.dispose();
     super.dispose();
   }
 }

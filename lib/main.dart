@@ -434,7 +434,7 @@ class SomitiPage extends StatelessWidget {
 
               // ================= Join Somiti Button =================
               GreenButton(
-                label: 'সমিতিতে যোগদান করুন',
+                label: 'জেলা,উপজেলা সমিতিতে যোগদান করুন',
                 icon: Icons.person_add_outlined,
                 onTap: () {
                   Navigator.push(
@@ -445,21 +445,22 @@ class SomitiPage extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 20),
+
+              // const SizedBox(height: 20),
 
               // ================= Enter Somiti Button =================
-              GreenButton(
-                label: 'Admin login',
-                icon: Icons.login,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EnterSomitiPage(),
-                    ),
-                  );
-                },
-              ),
+              // GreenButton(
+              //   label: 'Admin login',
+              //   icon: Icons.login,
+              //   onTap: () {
+              //     Navigator.push(
+              //       context,
+              //       MaterialPageRoute(
+              //         builder: (context) => const EnterSomitiPage(),
+              //       ),
+              //     );
+              //   },
+              // ),
             ],
           ),
         ),

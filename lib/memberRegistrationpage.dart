@@ -1,8 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ru_family/dashboard.dart';
+import 'package:http/http.dart' as http;
+import 'package:ru_family/dashboard.dart'; // Make sure this is SomitiDashboard
 
 class MemberRegistrationPage extends StatefulWidget {
   const MemberRegistrationPage({super.key});
@@ -18,7 +21,6 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _mobileController = TextEditingController();
-  final _hallController = TextEditingController();
   final _presentAddressController = TextEditingController();
   final _permanentAddressController = TextEditingController();
   final _emergencyContactController = TextEditingController();
@@ -27,12 +29,16 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
   String? _selectedSomiti;
   String? _selectedBloodGroup;
   List<String> _somitiNames = [];
-  String _searchQuery = '';
   bool _isLoadingSomitis = true;
   bool _isSubmitting = false;
   bool _showVerification = false;
+  bool _isVerifying = false;
 
-  // Blood groups
+  // Auto-detected values
+  String _detectedSession = '';
+  String _detectedHall = '';
+  String _detectedDept = '';
+
   final List<String> _bloodGroups = [
     'A+',
     'A-',
@@ -44,20 +50,31 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
     'O-',
   ];
 
+  // JSON cache
+  List<Map<String, dynamic>> _hallList = [];
+  List<Map<String, dynamic>> _deptList = [];
+  bool _isLoadingHallDept = false;
+
+  Timer? _verificationTimer;
+  int _retryCount = 0;
+  final int _maxRetries = 40; // ~2 minutes max
+
   @override
   void initState() {
     super.initState();
     _fetchSomitiNames();
+    _fetchHallAndDeptData();
+    _universityIdController.addListener(_onUniversityIdChanged);
   }
 
   @override
   void dispose() {
+    _verificationTimer?.cancel();
     _nameController.dispose();
     _universityIdController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _mobileController.dispose();
-    _hallController.dispose();
     _presentAddressController.dispose();
     _permanentAddressController.dispose();
     _emergencyContactController.dispose();
@@ -65,16 +82,13 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
     super.dispose();
   }
 
+  // ==================== SOMITI LOADING ====================
   Future<void> _fetchSomitiNames() async {
-    setState(() {
-      _isLoadingSomitis = true;
-    });
-
+    setState(() => _isLoadingSomitis = true);
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('somitis')
           .get();
-
       setState(() {
         _somitiNames = snapshot.docs
             .map((doc) => doc['somitiName'] as String)
@@ -82,135 +96,225 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
         _isLoadingSomitis = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('সমিতি লোড করতে সমস্যা: $e')));
+      _showSnackBar('সমিতি লোড করতে সমস্যা: $e');
+      setState(() => _isLoadingSomitis = false);
+    }
+  }
+
+  // ==================== HALL & DEPT JSON ====================
+  Future<void> _fetchHallAndDeptData() async {
+    setState(() => _isLoadingHallDept = true);
+    try {
+      final hallRes = await http.get(
+        Uri.parse(
+          'https://raw.githubusercontent.com/prodhan2/App_Backend_Data/main/MyApi/RU_Hall_api.json',
+        ),
+      );
+      final deptRes = await http.get(
+        Uri.parse(
+          'https://raw.githubusercontent.com/prodhan2/App_Backend_Data/main/MyApi/RU_Subjcet_api.json',
+        ),
+      );
+
+      if (hallRes.statusCode == 200 && deptRes.statusCode == 200) {
+        final hallJson = jsonDecode(hallRes.body) as List;
+        final deptJson = jsonDecode(deptRes.body) as List;
+
+        setState(() {
+          _hallList = hallJson.cast<Map<String, dynamic>>();
+          _deptList = deptJson.cast<Map<String, dynamic>>();
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Hall/Dept লোড করতে সমস্যা: $e');
+    } finally {
+      setState(() => _isLoadingHallDept = false);
+    }
+  }
+
+  // ==================== UNIVERSITY ID AUTO-DETECT ====================
+  void _onUniversityIdChanged() {
+    final id = _universityIdController.text.trim();
+
+    if (id.length != 10 || !RegExp(r'^\d{10}$').hasMatch(id)) {
       setState(() {
-        _isLoadingSomitis = false;
+        _detectedSession = _detectedHall = _detectedDept = '';
       });
-    }
-  }
-
-  List<String> _getFilteredSomitiNames() {
-    if (_searchQuery.isEmpty) {
-      return _somitiNames;
-    }
-    return _somitiNames
-        .where(
-          (name) => name.toLowerCase().contains(_searchQuery.toLowerCase()),
-        )
-        .toList();
-  }
-
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate() || _selectedSomiti == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('সমস্ত তথ্য পূরণ করুন।')));
       return;
     }
 
+    // Session: first 2 digits → 21 → 2020-21
+    final sessionCode = id.substring(0, 2);
+    final sessionYear = int.parse('20$sessionCode') - 1;
+    final session = '$sessionYear-${sessionYear + 1}';
+
+    // Hall: next 3 digits → 104
+    final hallCode = int.tryParse(id.substring(2, 5));
+    final hallEntry = hallCode != null
+        ? _hallList.firstWhere(
+            (e) => e['hallCode'] == hallCode,
+            orElse: () => {},
+          )
+        : null;
+    final hallName = hallEntry?['hallName']?.toString() ?? 'অজানা হল';
+
+    // Department: digits 6-7 → 76
+    final deptCodeStr = id.substring(5, 7);
+    final deptCode = int.tryParse(deptCodeStr);
+    final deptEntry = deptCode != null
+        ? _deptList.firstWhere((e) => e['code'] == deptCode, orElse: () => {})
+        : null;
+    final deptName = deptEntry?['name']?.toString() ?? 'অজানা বিভাগ';
+
     setState(() {
-      _isSubmitting = true;
+      _detectedSession = session;
+      _detectedHall = hallName;
+      _detectedDept = deptName;
     });
+  }
+
+  // ==================== FORM SUBMIT ====================
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate() ||
+        _selectedSomiti == null ||
+        _universityIdController.text.length != 10) {
+      _showSnackBar('সমস্ত তথ্য সঠিকভাবে পূরণ করুন।');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     try {
-      // Create user with email and password
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-      // Send email verification
-      await userCredential.user!.sendEmailVerification();
+      await cred.user!.sendEmailVerification();
 
-      // Add member data to Firestore
+      // Save to Firestore
       await FirebaseFirestore.instance.collection('members').add({
         'name': _nameController.text.trim(),
         'universityId': _universityIdController.text.trim(),
         'email': _emailController.text.trim(),
         'mobileNumber': _mobileController.text.trim(),
-        'hall': _hallController.text.trim(),
+        'hall': _detectedHall,
+        'department': _detectedDept,
         'presentAddress': _presentAddressController.text.trim(),
         'permanentAddress': _permanentAddressController.text.trim(),
         'emergencyContact': _emergencyContactController.text.trim(),
         'socialMediaId': _socialMediaIdController.text.trim(),
         'bloodGroup': _selectedBloodGroup ?? '',
         'somitiName': _selectedSomiti,
+        'session': _detectedSession,
         'createdAt': FieldValue.serverTimestamp(),
-        'uid': userCredential.user!.uid,
+        'uid': cred.user!.uid,
       });
 
       if (mounted) {
         setState(() {
           _showVerification = true;
+          _isVerifying = true;
+          _retryCount = 0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'সদস্য তথ্য সফলভাবে সংরক্ষিত! ইমেইলে ভেরিফিকেশন লিঙ্ক চেক করুন এবং নিচের বাটনে ক্লিক করুন।',
-            ),
-            backgroundColor: Colors.green,
-          ),
+
+        _showSnackBar(
+          'ইমেইল ভেরিফিকেশন লিঙ্ক পাঠানো হয়েছে। চেক করুন!',
+          backgroundColor: Colors.green,
         );
+
+        _startVerificationPolling();
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'সংরক্ষণ ত্রুটি';
+      String msg = 'সংরক্ষণ ত্রুটি';
       if (e.code == 'email-already-in-use') {
-        message = 'এই ইমেইল ইতিমধ্যে ব্যবহার করা হয়েছে।';
+        msg = 'এই ইমেইল ইতিমধ্যে ব্যবহার করা হয়েছে।';
       } else if (e.code == 'weak-password') {
-        message = 'পাসওয়ার্ড দুর্বল।';
+        msg = 'পাসওয়ার্ড দুর্বল।';
       }
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-      }
+      _showSnackBar(msg);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('সংরক্ষণ ত্রুটি: $e')));
-      }
+      _showSnackBar('সংরক্ষণ ত্রুটি: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  Future<void> _checkVerification() async {
+  // ==================== AUTO VERIFICATION POLLING ====================
+  void _startVerificationPolling() {
+    _verificationTimer = Timer.periodic(const Duration(seconds: 3), (
+      timer,
+    ) async {
+      if (_retryCount++ >= _maxRetries) {
+        timer.cancel();
+        if (mounted) {
+          setState(() => _isVerifying = false);
+          _showSnackBar(
+            'সময় শেষ। ম্যানুয়ালি চেক করুন।',
+            backgroundColor: Colors.orange,
+          );
+        }
+        return;
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        timer.cancel();
+        return;
+      }
+
+      try {
+        await user.reload();
+        if (user.emailVerified) {
+          timer.cancel();
+          if (mounted) {
+            _showSnackBar(
+              'ইমেইল ভেরিফাইড! ড্যাশবোর্ডে যাচ্ছেন...',
+              backgroundColor: Colors.green,
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const SomitiDashboard()),
+            );
+          }
+        }
+      } catch (e) {
+        // Ignore network errors, continue polling
+      }
+    });
+  }
+
+  // Optional: Manual check fallback
+  Future<void> _checkVerificationManually() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       await user.reload();
-      await user.getIdToken(true); // Refresh token
       if (user.emailVerified) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const SomitiDashboard()),
-          );
-        }
+        _verificationTimer?.cancel();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SomitiDashboard()),
+        );
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('এখনও ইমেইল ভেরিফাই করা হয়নি। লিঙ্কে ক্লিক করুন।'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        _showSnackBar(
+          'এখনও ভেরিফাই করা হয়নি। ইমেইল চেক করুন।',
+          backgroundColor: Colors.orange,
+        );
       }
     }
   }
 
+  // Helper: Show SnackBar
+  void _showSnackBar(String message, {Color? backgroundColor}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+  }
+
+  // ==================== UI BUILD ====================
   @override
   Widget build(BuildContext context) {
-    final filteredSomitiNames = _getFilteredSomitiNames();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('সদস্য নিবন্ধন'),
@@ -228,21 +332,40 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
               children: [
                 if (!_showVerification) ...[
                   // Name
-                  TextFormField(
-                    controller: _nameController,
+                  _buildTextField(
+                    _nameController,
+                    'নাম',
+                    Icons.person,
+                    validator: (v) =>
+                        v?.isEmpty ?? true ? 'নাম প্রয়োজনীয়।' : null,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Somiti Dropdown
+                  DropdownButtonFormField<String>(
+                    value: _selectedSomiti,
                     decoration: const InputDecoration(
-                      labelText: 'নাম',
-                      prefixIcon: Icon(Icons.person),
+                      labelText: 'সমিতি নির্বাচন করুন',
+                      prefixIcon: Icon(Icons.groups),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'নাম প্রয়োজনীয়।';
-                      }
-                      return null;
-                    },
+                    hint: _isLoadingSomitis
+                        ? const Text('লোড হচ্ছে...')
+                        : const Text('সমিতি নির্বাচন করুন'),
+                    isExpanded: true,
+                    items: _somitiNames
+                        .map(
+                          (name) =>
+                              DropdownMenuItem(value: name, child: Text(name)),
+                        )
+                        .toList(),
+                    onChanged: _isLoadingSomitis
+                        ? null
+                        : (v) => setState(() => _selectedSomiti = v),
+                    validator: (v) => v == null ? 'সমিতি নির্বাচন করুন।' : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -250,190 +373,156 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
                   TextFormField(
                     controller: _universityIdController,
                     decoration: const InputDecoration(
-                      labelText: 'বিশ্ববিদ্যালয় আইডি',
+                      labelText: 'বিশ্ববিদ্যালয় আইডি (যেমন: 2110476128)',
                       prefixIcon: Icon(Icons.school),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'বিশ্ববিদ্যালয় আইডি প্রয়োজনীয়।';
-                      }
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (v) {
+                      if (v?.isEmpty ?? true) return 'আইডি প্রয়োজনীয়।';
+                      if (v!.length != 10) return 'আইডি ১০ সংখ্যার হতে হবে।';
                       return null;
                     },
                   ),
+
+                  // Auto-detected info
+                  if (_detectedSession.isNotEmpty ||
+                      _detectedHall.isNotEmpty ||
+                      _detectedDept.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Card(
+                        color: Colors.green.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_detectedSession.isNotEmpty)
+                                Text(
+                                  'সেশন: $_detectedSession',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              if (_detectedHall.isNotEmpty)
+                                Text(
+                                  'হল: $_detectedHall',
+                                  style: const TextStyle(color: Colors.green),
+                                ),
+                              if (_detectedDept.isNotEmpty)
+                                Text(
+                                  'বিভাগ: $_detectedDept',
+                                  style: const TextStyle(color: Colors.purple),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
 
                   // Email
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'ইমেইল',
-                      prefixIcon: Icon(Icons.email),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                  _buildTextField(
+                    _emailController,
+                    'ইমেইল',
+                    Icons.email,
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'ইমেইল প্রয়োজনীয়।';
-                      }
+                    validator: (v) {
+                      if (v?.isEmpty ?? true) return 'ইমেইল প্রয়োজনীয়।';
                       if (!RegExp(
                         r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value)) {
-                        return 'অবৈধ ইমেইল ঠিকানা।';
-                      }
+                      ).hasMatch(v!))
+                        return 'অবৈধ ইমেইল।';
                       return null;
                     },
                   ),
+
                   const SizedBox(height: 16),
 
                   // Password
-                  TextFormField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'পাসওয়ার্ড',
-                      prefixIcon: Icon(Icons.lock),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                  _buildTextField(
+                    _passwordController,
+                    'পাসওয়ার্ড',
+                    Icons.lock,
                     obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'পাসওয়ার্ড প্রয়োজনীয়।';
-                      }
-                      if (value.length < 6) {
-                        return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।';
-                      }
+                    validator: (v) {
+                      if (v?.isEmpty ?? true) return 'পাসওয়ার্ড প্রয়োজনীয়।';
+                      if (v!.length < 6) return 'কমপক্ষে ৬ অক্ষর।';
                       return null;
                     },
                   ),
+
                   const SizedBox(height: 16),
 
-                  // Mobile Number
-                  TextFormField(
-                    controller: _mobileController,
-                    decoration: const InputDecoration(
-                      labelText: 'মোবাইল নম্বর',
-                      prefixIcon: Icon(Icons.phone),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                  // Mobile
+                  _buildTextField(
+                    _mobileController,
+                    'মোবাইল নম্বর',
+                    Icons.phone,
                     keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'মোবাইল নম্বর প্রয়োজনীয়।';
-                      }
-                      if (value.length < 11) {
-                        return 'সঠিক মোবাইল নম্বর দিন।';
-                      }
+                    validator: (v) {
+                      if (v?.isEmpty ?? true) return 'মোবাইল প্রয়োজনীয়।';
+                      if (v!.length < 11) return 'সঠিক নম্বর দিন।';
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
 
-                  // Hall
-                  TextFormField(
-                    controller: _hallController,
-                    decoration: const InputDecoration(
-                      labelText: 'হল',
-                      prefixIcon: Icon(Icons.home),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'হলের নাম প্রয়োজনীয়।';
-                      }
-                      return null;
-                    },
-                  ),
                   const SizedBox(height: 16),
 
                   // Present Address
-                  TextFormField(
-                    controller: _presentAddressController,
-                    decoration: const InputDecoration(
-                      labelText: 'বর্তমান ঠিকানা',
-                      prefixIcon: Icon(Icons.location_on),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                  _buildTextField(
+                    _presentAddressController,
+                    'বর্তমান ঠিকানা',
+                    Icons.location_on,
                     maxLines: 3,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'বর্তমান ঠিকানা প্রয়োজনীয়।';
-                      }
-                      return null;
-                    },
+                    validator: (v) => v?.isEmpty ?? true
+                        ? 'বর্তমান ঠিকানা প্রয়োজনীয়।'
+                        : null,
                   ),
+
                   const SizedBox(height: 16),
 
                   // Permanent Address
-                  TextFormField(
-                    controller: _permanentAddressController,
-                    decoration: const InputDecoration(
-                      labelText: 'স্থায়ী ঠিকানা',
-                      prefixIcon: Icon(Icons.location_city),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                  _buildTextField(
+                    _permanentAddressController,
+                    'স্থায়ী ঠিকানা',
+                    Icons.location_city,
                     maxLines: 3,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'স্থায়ী ঠিকানা প্রয়োজনীয়।';
-                      }
-                      return null;
-                    },
+                    validator: (v) => v?.isEmpty ?? true
+                        ? 'স্থায়ী ঠিকানা প্রয়োজনীয়।'
+                        : null,
                   ),
+
                   const SizedBox(height: 16),
 
                   // Emergency Contact
-                  TextFormField(
-                    controller: _emergencyContactController,
-                    decoration: const InputDecoration(
-                      labelText: 'জরুরি যোগাযোগ (পরিবারের সংখ্যা/নম্বর)',
-                      prefixIcon: Icon(Icons.security),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'জরুরি যোগাযোগ প্রয়োজনীয়।';
-                      }
-                      return null;
-                    },
+                  _buildTextField(
+                    _emergencyContactController,
+                    'জরুরি যোগাযোগ',
+                    Icons.security,
+                    validator: (v) => v?.isEmpty ?? true
+                        ? 'জরুরি যোগাযোগ প্রয়োজনীয়।'
+                        : null,
                   ),
+
                   const SizedBox(height: 16),
 
                   // Social Media ID
-                  TextFormField(
-                    controller: _socialMediaIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'সোশ্যাল মিডিয়া আইডি',
-                      prefixIcon: Icon(Icons.share),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'সোশ্যাল মিডিয়া আইডি প্রয়োজনীয়।';
-                      }
-                      return null;
-                    },
+                  _buildTextField(
+                    _socialMediaIdController,
+                    'সোশ্যাল মিডিয়া আইডি',
+                    Icons.share,
+                    validator: (v) =>
+                        v?.isEmpty ?? true ? 'সোশ্যাল আইডি প্রয়োজনীয়।' : null,
                   ),
+
                   const SizedBox(height: 16),
 
-                  // Blood Group Dropdown
+                  // Blood Group
                   DropdownButtonFormField<String>(
                     value: _selectedBloodGroup,
                     decoration: const InputDecoration(
@@ -443,89 +532,16 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
                     ),
-                    items: _bloodGroups.map((group) {
-                      return DropdownMenuItem<String>(
-                        value: group,
-                        child: Text(group),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedBloodGroup = value;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null) {
-                        return 'রক্তের গ্রুপ নির্বাচন করুন।';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Searchable Somiti Dropdown
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'সমিতি নির্বাচন করুন',
-                        style: TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'সমিতি খুঁজুন...',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (_isLoadingSomitis)
-                        const Center(child: CircularProgressIndicator())
-                      else if (_getFilteredSomitiNames().isEmpty)
-                        const Text('কোনো সমিতি পাওয়া যায়নি।')
-                      else
-                        Container(
-                          constraints: const BoxConstraints(maxHeight: 150),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListView.builder(
-                            itemCount: _getFilteredSomitiNames().length,
-                            itemBuilder: (context, index) {
-                              final name = _getFilteredSomitiNames()[index];
-                              return ListTile(
-                                title: Text(name),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedSomiti = name;
-                                    _searchQuery = '';
-                                  });
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      if (_selectedSomiti != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            'নির্বাচিত: $_selectedSomiti',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                    ],
+                    items: _bloodGroups
+                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedBloodGroup = v),
+                    validator: (v) =>
+                        v == null ? 'রক্তের গ্রুপ নির্বাচন করুন।' : null,
                   ),
                   const SizedBox(height: 32),
 
+                  // Submit Button
                   SizedBox(
                     height: 50,
                     child: ElevatedButton(
@@ -542,7 +558,7 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
+                                valueColor: AlwaysStoppedAnimation(
                                   Colors.white,
                                 ),
                               ),
@@ -557,49 +573,62 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
                     ),
                   ),
                 ] else ...[
-                  // Verification Section
+                  // Verification Screen
                   Card(
+                    elevation: 4,
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(20.0),
                       child: Column(
                         children: [
-                          const Icon(Icons.email, size: 80, color: Colors.blue),
+                          Icon(
+                            _isVerifying
+                                ? Icons.hourglass_empty
+                                : Icons.mark_email_read,
+                            size: 80,
+                            color: _isVerifying ? Colors.orange : Colors.green,
+                          ),
                           const SizedBox(height: 16),
-                          const Text(
-                            'ইমেইল ভেরিফিকেশন',
-                            style: TextStyle(
-                              fontSize: 24,
+                          Text(
+                            _isVerifying
+                                ? 'ভেরিফিকেশন চেক হচ্ছে...'
+                                : 'ইমেইল ভেরিফাইড!',
+                            style: const TextStyle(
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Text(
-                            'আপনার ইমেইলে একটি লিঙ্ক পাঠানো হয়েছে: ${_emailController.text.trim()}',
+                            'ইমেইল পাঠানো হয়েছে:\n${_emailController.text.trim()}',
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontSize: 16),
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            'লিঙ্কে ক্লিক করুন এবং নিচের বাটনে ক্লিক করে ভেরিফিকেশন চেক করুন।',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
+                          if (_isVerifying) ...[
+                            const LinearProgressIndicator(),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'ইনবক্স/স্প্যাম চেক করুন। লিঙ্কে ক্লিক করুন।\n'
+                              'ভেরিফাই হলে স্বয়ংক্রিয়ভাবে ড্যাশবোর্ডে যাবেন।',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 24),
+
+                          // Manual Check (Fallback)
                           SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton.icon(
-                              onPressed: _checkVerification,
-                              icon: const Icon(
-                                Icons.check_circle,
-                                color: Colors.white,
-                              ),
-                              label: const Text(
-                                'ভেরিফিকেশন চেক করুন',
-                                style: TextStyle(color: Colors.white),
+                              onPressed: _isVerifying
+                                  ? null
+                                  : _checkVerificationManually,
+                              icon: const Icon(Icons.refresh),
+                              label: Text(
+                                _isVerifying
+                                    ? 'চেক হচ্ছে...'
+                                    : 'ম্যানুয়ালি চেক করুন',
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
@@ -609,14 +638,14 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           TextButton(
                             onPressed: () {
+                              _verificationTimer?.cancel();
                               setState(() {
                                 _showVerification = false;
+                                _isVerifying = false;
                               });
-                              _emailController.clear();
-                              // Clear other fields if needed
                             },
                             child: const Text('ফর্মে ফিরে যান'),
                           ),
@@ -632,6 +661,32 @@ class _MemberRegistrationPageState extends State<MemberRegistrationPage> {
       ),
     );
   }
-}
 
-// Placeholder for SomitiDashboard - define this class elsewhere in your app
+  // Helper: Reusable TextFormField
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    int? maxLines = 1,
+    String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      inputFormatters: inputFormatters,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+      validator: validator,
+    );
+  }
+}
