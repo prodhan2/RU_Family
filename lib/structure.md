@@ -1,101 +1,103 @@
-Here’s a **Firebase Firestore structure design** for your app, based on the two collections you described — **`somitis`** and **`members`**.
+Absolutely ✅ — here’s your **complete and organized Firestore Structure Overview**, including all **four collections** (`somitis`, `members`, `images`, `teachers`)
+plus the **relationship mapping** between them.
 
 ---
 
-## 🔹 Collection 1: `somitis`
+## 🗂️ **Firestore Structure Overview**
 
-Each document in `somitis` represents a **Somiti (association)** created by a user.
+```
+Firestore Root
+├── somitis (collection)
+│   ├── {somitiId or userId} (document)
+│   │    ├── createdAt: Timestamp
+│   │    ├── districtId: "54"
+│   │    ├── districtName: "দিনাজপুর"
+│   │    ├── divisionId: "7"
+│   │    ├── divisionName: "রংপুর"
+│   │    ├── email: "safokil925@dropeso.com"
+│   │    ├── emailVerified: false
+│   │    ├── somitiName: "চিরিরবন্দর উপজেলা সমিতি"
+│   │    ├── somitiType: "upazilla"
+│   │    ├── upazillaId: "416"
+│   │    ├── upazillaName: "চিরিরবন্দর"
+│   │    └── userId: "4ckpZhGKehZ0DsNyJh39OaPxk7v2"
 
-### Example structure:
+├── members (collection)
+│   ├── {memberUid} (document)
+│   │    ├── bloodGroup: "B+"
+│   │    ├── createdAt: Timestamp
+│   │    ├── department: "Computer Science and Engineering"
+│   │    ├── email: "pivow96556@dropeso.com"
+│   │    ├── emergencyContact: "01902388308"
+│   │    ├── hall: "Syed Amer Ali Hall"
+│   │    ├── mobileNumber: "01902388308"
+│   │    ├── name: "pivow9655"
+│   │    ├── permanentAddress: "মুর্শিদহাট, Bochaganj উপজেলা, Dinajpur জেলা, Rangpur বিভাগ"
+│   │    ├── presentAddress: "Rajshahi University room number 202"
+│   │    ├── session: "2020-2021"
+│   │    ├── socialMediaId: "fb.com/prodhan2"
+│   │    ├── somitiName: "Bochaganj Upazilla Somiti"
+│   │    ├── uid: "9sXGA4WW37QE7BhUnh2bh0J5I512"
+│   │    └── universityId: "2110476128"
 
-```json
-somitis (collection)
-│
-├── <autoId or somitiId>
-│   ├── somitiName: "Bhandaria উপজেলা সমিতি"
-│   ├── somitiType: "upazilla"
-│   ├── divisionId: "4"
-│   ├── divisionName: "Barisal"
-│   ├── districtId: "32"
-│   ├── districtName: "Pirojpur"
-│   ├── upazillaId: "246"
-│   ├── upazillaName: "Bhandaria"
-│   ├── email: "prodhan238@gmail.com"
-│   ├── emailVerified: false
-│   ├── userId: "7WA20R342GRA217b0uCjkozyWpq1"   // Creator UID
-│   ├── createdAt: Timestamp("2025-10-28T21:41:41+06:00")
+├── images (collection)
+│   ├── {imageDocId} (document)
+│   │    ├── createdAt: Timestamp
+│   │    ├── folder: "Sujan Prodhan"
+│   │    ├── imageUrls: [ ...list of image URLs... ]
+│   │    ├── somitiName: "Bochaganj Upazilla Somiti"
+│   │    ├── uploadedByEmail: "pr.odhan238@gmail.com"
+│   │    └── uploadedByName: "User"
+
+└── teachers (collection)
+    ├── {teacherId} (document)
+    │    ├── addedByEmail: "pr.odhan238@gmail.com"
+    │    ├── addedByUid: "N86faXEr91gtlWd6ml55PymYCLJ2"
+    │    ├── address: "rajshahi university hall number 1"
+    │    ├── bloodGroup: "B+"
+    │    ├── createdAt: Timestamp
+    │    ├── department: "Marketing"
+    │    ├── mobile: "01902383808"
+    │    ├── name: "animaul"
+    │    ├── socialMedia: [
+    │    │   "https://fb.com/prodhan2"
+    │    │ ]
+    │    └── somitiName: "Bochaganj Upazilla Somiti"
 ```
 
 ---
 
-## 🔹 Collection 2: `members`
+## 🔗 **Relationships Between Collections**
 
-Each document in `members` represents a **member/student/person** who belongs to a Somiti.
+| From Collection | Field Used                 | To Collection             | Relation Description                           |
+| --------------- | -------------------------- | ------------------------- | ---------------------------------------------- |
+| `members`       | `somitiName` or `somitiId` | `somitis`                 | Each member belongs to one Somiti              |
+| `images`        | `somitiName` or `somitiId` | `somitis`                 | Each image group is uploaded for a Somiti      |
+| `teachers`      | `somitiName` or `somitiId` | `somitis`                 | Each teacher is associated with one Somiti     |
+| `somitis`       | `userId`                   | `users` *(Firebase Auth)* | Somiti created by a registered user            |
+| `teachers`      | `addedByUid`               | `users` *(Firebase Auth)* | Teacher entry created by a specific user/admin |
 
-### Example structure:
+---
 
-```json
-members (collection)
-│
-├── <autoId or memberId>
-│   ├── name: "waerdtf"
-│   ├── email: "weqr@ewr.com"
-│   ├── mobileNumber: "019023838308"
-│   ├── emergencyContact: "21343"
-│   ├── hall: "wadsfnbd"
-│   ├── bloodGroup: "B+"
-│   ├── socialMediaId: "324"
-│   ├── permanentAddress: "ds bh23423"
-│   ├── presentAddress: "dsf"
-│   ├── universityId: "wqert"
-│   ├── somitiName: "Patuakhali Sadar উপজেলা সমিতি"
-│   ├── createdAt: Timestamp("2025-10-28T22:27:04+06:00")
+### 🔶 Example Relationship Flow
+
+```
+User (Firebase Auth)
+   └── creates Somiti (somitis)
+         ├── Members (members) → related by somitiName
+         ├── Teachers (teachers) → related by somitiName
+         └── Images (images) → related by somitiName
 ```
 
 ---
 
-## 🔗 Relationship (how they connect)
+### ✅ Summary of Use
 
-* The **`somitiName`** field in the `members` collection matches the **`somitiName`** in the `somitis` collection.
-* Or you can make it more robust using a **foreign key approach**, e.g.:
-
-```json
-members
-│
-├── <autoId>
-│   ├── somitiId: "<matching somiti document ID>"
-│   ├── ...
-```
-
-That way, you can query members more easily like:
-
-```dart
-FirebaseFirestore.instance
-  .collection('members')
-  .where('somitiId', isEqualTo: selectedSomitiId)
-```
+| Collection | Purpose                | Key Identifier              |
+| ---------- | ---------------------- | --------------------------- |
+| `somitis`  | Holds main Somiti info | `somitiName` / `userId`     |
+| `members`  | Stores Somiti members  | `somitiName` + `uid`        |
+| `images`   | Stores image galleries | `somitiName`                |
+| `teachers` | Stores teachers list   | `somitiName` + `addedByUid` |
 
 ---
-
-## ✅ Suggested Improvement (Recommended)
-
-To avoid name mismatch issues:
-
-* Use `somitiId` instead of `somitiName` to link the two collections.
-* Store both name and ID in members for faster UI display.
-
-### Example:
-
-```json
-members
-│
-├── <autoId>
-│   ├── somitiId: "abC123xYZ"  // Firestore doc ID from somitis
-│   ├── somitiName: "Bhandaria উপজেলা সমিতি"
-│   ├── bloodGroup: "B+"
-│   ├── ...
-```
-
----
-
-Would you like me to show you the **Firestore security rules** for this structure (so only the creator can modify their Somiti and its members)?

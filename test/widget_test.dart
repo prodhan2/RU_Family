@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ru_family/somitiCreate.dart';
+import 'package:ru_family/MakeSomiti/somitiCreate.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {

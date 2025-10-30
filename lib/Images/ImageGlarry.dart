@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:intl/intl.dart';
-import 'package:ru_family/ImagesTake.dart'; // AddImageGalleryPage
+import 'package:ru_family/Images/ImagesTake.dart'; // AddImageGalleryPage
 import 'package:share_plus/share_plus.dart';
 
 class ImageGalleryPageview extends StatefulWidget {
@@ -22,7 +22,7 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
   String? currentUserUid;
   String? currentUserEmail;
 
-  List<ImageItem> allImages = []; // All images in this somiti
+  List<ImageItem> allImages = [];
   Map<String, List<ImageItem>> folderImages = {};
   List<String> folders = [];
 
@@ -43,6 +43,12 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
 
   late FocusNode _searchFocusNode;
   bool isSearchExpanded = false;
+
+  // ==================== SAFE FIRST CHAR ====================
+  String getFirstChar(dynamic input) {
+    final str = input?.toString().trim() ?? '';
+    return str.isNotEmpty ? str[0].toUpperCase() : '?';
+  }
 
   @override
   void initState() {
@@ -88,7 +94,7 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
       final email = data['uploadedByEmail'] as String?;
-      final isOwn = email == currentUserEmail; // Only for edit/delete
+      final isOwn = email == currentUserEmail;
 
       final urls = (data['imageUrls'] as List<dynamic>?)?.cast<String>() ?? [];
       final folder = data['folder'] as String? ?? 'Uncategorized';
@@ -113,20 +119,21 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
       tempFolders.putIfAbsent(folder, () => []).addAll(items);
     }
 
-    // Sort newest first
     tempAll.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     for (final entry in tempFolders.entries) {
       entry.value.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
     final sortedFolders = tempFolders.keys.toList()..sort();
 
-    setState(() {
-      allImages = tempAll;
-      folderImages = tempFolders;
-      folders = sortedFolders;
-      _updateFilteredData();
-      isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        allImages = tempAll;
+        folderImages = tempFolders;
+        folders = sortedFolders;
+        _updateFilteredData();
+        isLoading = false;
+      });
+    }
   }
 
   // ==================== SELECTION MODE ====================
@@ -186,24 +193,28 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
       }
       await batch.commit();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${selectedDocIds.length} item(s) deleted'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${selectedDocIds.length} item(s) deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
 
       selectedDocIds.clear();
       await _loadImages();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Delete failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -211,12 +222,10 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
   void _updateFilteredData() {
     List<ImageItem> tempImages = List.from(allImages);
 
-    // Folder filter
     if (selectedFolder != 'All') {
       tempImages = tempImages.where((i) => i.folder == selectedFolder).toList();
     }
 
-    // Search filter
     if (searchQuery.isNotEmpty) {
       tempImages = tempImages
           .where(
@@ -229,7 +238,6 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
           .toList();
     }
 
-    // Date filter
     if (filterRange != null) {
       final start = DateTime(
         filterRange!.start.year,
@@ -252,7 +260,6 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
     tempImages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _filteredImages = tempImages;
 
-    // Folder filtering for search in folder mode
     List<String> tempFolders = List.from(folders);
     if (searchQuery.isNotEmpty && viewMode == 'folders') {
       tempFolders = tempFolders.where((f) {
@@ -288,7 +295,8 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                     ? widget.somitiName
                     : '${widget.somitiName} Folders'),
         ),
-        backgroundColor: isSelectionMode ? Colors.red : Colors.teal,
+        backgroundColor: isSelectionMode ? Colors.red : Colors.blue,
+        foregroundColor: Colors.white,
         actions: [
           if (hasOwnContent && !isSelectionMode)
             IconButton(
@@ -331,8 +339,9 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
             ),
           ).then((_) => _loadImages());
         },
-        backgroundColor: Colors.orange,
-        child: const Icon(Icons.add_link, color: Colors.white),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add_link),
         tooltip: 'Add images',
       ),
       body: isLoading
@@ -380,6 +389,12 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Colors.blue,
+                                ),
+                              ),
                               filled: true,
                               fillColor: Colors.white,
                             ),
@@ -401,6 +416,17 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                                         const Duration(days: 1),
                                       ),
                                       initialDateRange: filterRange,
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: Theme.of(context).copyWith(
+                                            colorScheme:
+                                                const ColorScheme.light(
+                                                  primary: Colors.blue,
+                                                ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
                                     );
                                     if (picked != null && mounted) {
                                       setState(() => filterRange = picked);
@@ -413,6 +439,12 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                                   labelText: 'Date',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: Colors.blue,
+                                    ),
                                   ),
                                   suffixIcon: const Icon(
                                     Icons.calendar_today,
@@ -439,6 +471,12 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Colors.blue,
+                                ),
+                              ),
                             ),
                             style: const TextStyle(fontSize: 11),
                             items: [
@@ -454,7 +492,7 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                                   value: f,
                                   child: Text(
                                     f,
-                                    style: TextStyle(fontSize: 11),
+                                    style: const TextStyle(fontSize: 11),
                                   ),
                                 ),
                               ),
@@ -474,7 +512,7 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                 // Main Content
                 Expanded(
                   child: viewMode == 'all'
-                      ? _buildImageGrid(_filteredImages) // ALL images
+                      ? _buildImageGrid(_filteredImages)
                       : _buildFolderGrid(_filteredFolders),
                 ),
               ],
@@ -546,15 +584,33 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                               end: Alignment.topCenter,
                             ),
                           ),
-                          child: Text(
-                            item.uploadedByName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 8,
+                                backgroundColor: Colors.blue,
+                                child: Text(
+                                  getFirstChar(item.uploadedByName),
+                                  style: const TextStyle(
+                                    fontSize: 8,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  item.uploadedByName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -586,7 +642,7 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
     );
   }
 
-  // ==================== FOLDER GRID (ONLY OWN FOLDERS) ====================
+  // ==================== FOLDER GRID ====================
   Widget _buildFolderGrid(List<String> filteredFolders) {
     if (filteredFolders.isEmpty)
       return const Center(child: Text('No folders found'));
@@ -633,6 +689,9 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
             children: [
               Card(
                 elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
@@ -650,7 +709,10 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                             width: double.infinity,
                             fit: BoxFit.cover,
                             placeholder: (_, __) => const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.blue,
+                              ),
                             ),
                           ),
                         ),
@@ -747,7 +809,8 @@ class FolderDetailPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('$somitiName - $folderName'),
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
       body: images.isEmpty
           ? const Center(child: Text('No images'))
@@ -913,16 +976,30 @@ class _FullScreenImageCarouselState extends State<FullScreenImageCarousel> {
     final date = DateFormat(
       'dd MMM yyyy, h:mm a',
     ).format(item.createdAt.toDate());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          item.uploadedByName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 12,
+              backgroundColor: Colors.blue,
+              child: Text(
+                getFirstChar(item.uploadedByName),
+                style: const TextStyle(fontSize: 10, color: Colors.white),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              item.uploadedByName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         Text(date, style: const TextStyle(color: Colors.white70, fontSize: 14)),
@@ -933,5 +1010,10 @@ class _FullScreenImageCarouselState extends State<FullScreenImageCarousel> {
           ),
       ],
     );
+  }
+
+  String getFirstChar(String name) {
+    if (name.isEmpty) return '?';
+    return name[0].toUpperCase();
   }
 }

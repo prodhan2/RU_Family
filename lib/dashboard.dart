@@ -1,14 +1,20 @@
+// lib/SomitiDashboard.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:ru_family/AddTeacher.dart';
-import 'package:ru_family/ImageGlarry.dart';
-import 'package:ru_family/TeachersDisplay.dart';
+import 'package:ru_family/Images/ImageGlarry.dart'; // ImageGalleryPageview
+import 'package:ru_family/Teacher/TeachersDisplay.dart'; // TeachersBySomitiPage
 import 'package:ru_family/main.dart';
-import 'package:ru_family/studentlist.dart';
+import 'package:ru_family/Student/studentlist.dart';
 
 class SomitiDashboard extends StatelessWidget {
   const SomitiDashboard({super.key});
+
+  /// Safe first character extractor
+  String getFirstChar(dynamic input) {
+    final str = input?.toString().trim() ?? '';
+    return str.isNotEmpty ? str[0].toUpperCase() : '?';
+  }
 
   /// Fetch the somitiName of the logged-in user from Firestore
   Future<String> _fetchSomitiName() async {
@@ -39,7 +45,12 @@ class SomitiDashboard extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Colors.blue,
+                strokeWidth: 3,
+              ),
+            ),
           );
         }
 
@@ -47,18 +58,41 @@ class SomitiDashboard extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(somitiName),
-            backgroundColor: Colors.redAccent,
+            title: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.white,
+                  child: Text(
+                    getFirstChar(somitiName),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(somitiName, style: const TextStyle(fontSize: 16)),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
             actions: [
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () async {
                   await FirebaseAuth.instance.signOut();
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AuthWrapper()),
-                  );
+                  if (context.mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MyApp()),
+                    );
+                  }
                 },
+                tooltip: 'Logout',
               ),
             ],
           ),
@@ -67,9 +101,9 @@ class SomitiDashboard extends StatelessWidget {
             child: GridView(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.3,
               ),
               children: [
                 _buildDashboardButton(
@@ -77,28 +111,28 @@ class SomitiDashboard extends StatelessWidget {
                   'Student List',
                   Icons.people,
                   const MySomitiMembersNameList(),
-                  Colors.teal,
+                  Colors.blue.shade600,
                 ),
                 _buildDashboardButton(
                   context,
                   'Teacher List',
                   Icons.person,
                   const TeachersBySomitiPage(),
-                  Colors.indigo,
+                  Colors.blue.shade700,
                 ),
                 _buildDashboardButton(
                   context,
                   'Image Gallery',
-                  Icons.account_balance_wallet,
+                  Icons.photo_library,
                   ImageGalleryPageview(somitiName: somitiName),
-                  Colors.orange,
+                  Colors.blue.shade800,
                 ),
                 _buildDashboardButton(
                   context,
                   'Notice',
                   Icons.notifications,
                   const NoticePage(),
-                  Colors.red,
+                  Colors.blue.shade900,
                 ),
               ],
             ),
@@ -120,19 +154,22 @@ class SomitiDashboard extends StatelessWidget {
       onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => page)),
       child: Card(
         color: color,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Center(
+        elevation: 6,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 50, color: Colors.white),
-              const SizedBox(height: 10),
+              Icon(icon, size: 56, color: Colors.white),
+              const SizedBox(height: 12),
               Text(
                 title,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -151,7 +188,17 @@ class NoticePage extends StatelessWidget {
   const NoticePage({super.key});
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Notice')),
-    body: const Center(child: Text('This is the Notice page.')),
+    appBar: AppBar(
+      title: const Text('Notice'),
+      backgroundColor: Colors.blue,
+      foregroundColor: Colors.white,
+    ),
+    body: const Center(
+      child: Text(
+        'This is the Notice page.\nComing soon!',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 16),
+      ),
+    ),
   );
 }

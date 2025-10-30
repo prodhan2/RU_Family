@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:ru_family/MemberDetailsPage.dart';
+import 'package:ru_family/Student/MemberDetailsPage.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MySomitiMembersNameList extends StatefulWidget {
@@ -106,8 +106,9 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('$somitiName সদস্যদের তথ্য'),
-        backgroundColor: Colors.teal,
+        title: Text('$somitiName Members Information'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
@@ -140,14 +141,14 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                         if (s != null && s.isNotEmpty) sessSet.add(s);
                       }
 
-                      _departments = ['সব'] + deptSet.toList()
+                      _departments = ['All'] + deptSet.toList()
                         ..sort();
-                      _bloodGroups = ['সব'];
-                      _sessions = ['সব'];
+                      _bloodGroups = ['All'];
+                      _sessions = ['All'];
 
-                      // Cascading logic (same as before)
+                      // Cascading logic
                       if (_selectedDepartment != null &&
-                          _selectedDepartment != 'সব') {
+                          _selectedDepartment != 'All') {
                         final filteredBG = <String>{};
                         final filteredSess = <String>{};
                         for (var m in _allMembers) {
@@ -158,10 +159,10 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                             if (s != null && s.isNotEmpty) filteredSess.add(s);
                           }
                         }
-                        _bloodGroups = ['সব'] + filteredBG.toList()
+                        _bloodGroups = ['All'] + filteredBG.toList()
                           ..sort();
                         if (_selectedBloodGroup != null &&
-                            _selectedBloodGroup != 'সব') {
+                            _selectedBloodGroup != 'All') {
                           final sessFinal = <String>{};
                           for (var m in _allMembers) {
                             if (m['department'] == _selectedDepartment &&
@@ -170,20 +171,20 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                               if (s != null && s.isNotEmpty) sessFinal.add(s);
                             }
                           }
-                          _sessions = ['সব'] + sessFinal.toList()
+                          _sessions = ['All'] + sessFinal.toList()
                             ..sort();
                         } else {
-                          _sessions = ['সব'] + filteredSess.toList()
+                          _sessions = ['All'] + filteredSess.toList()
                             ..sort();
                         }
                       } else {
-                        _bloodGroups = ['সব'] + bgSet.toList()
+                        _bloodGroups = ['All'] + bgSet.toList()
                           ..sort();
-                        _sessions = ['সব'] + sessSet.toList()
+                        _sessions = ['All'] + sessSet.toList()
                           ..sort();
                       }
 
-                      // Final filtered list
+                      // Final filtered count
                       totalFiltered = _allMembers
                           .where((m) {
                             final name = (m['name'] ?? '')
@@ -194,15 +195,15 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                                 name.contains(_searchQuery);
                             final deptMatch =
                                 _selectedDepartment == null ||
-                                _selectedDepartment == 'সব' ||
+                                _selectedDepartment == 'All' ||
                                 m['department'] == _selectedDepartment;
                             final bgMatch =
                                 _selectedBloodGroup == null ||
-                                _selectedBloodGroup == 'সব' ||
+                                _selectedBloodGroup == 'All' ||
                                 m['bloodGroup'] == _selectedBloodGroup;
                             final sessMatch =
                                 _selectedSession == null ||
-                                _selectedSession == 'সব' ||
+                                _selectedSession == 'All' ||
                                 m['session'] == _selectedSession;
                             return matchesSearch &&
                                 deptMatch &&
@@ -216,7 +217,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                     return TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'সদস্যের নাম দিয়ে সার্চ করুন...',
+                        hintText: 'Search by member name...',
                         prefixIcon: const Icon(Icons.search),
                         suffixIcon: Padding(
                           padding: const EdgeInsets.only(
@@ -224,9 +225,9 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                             top: 12.0,
                           ),
                           child: Text(
-                            '$totalFiltered জন',
+                            '$totalFiltered members',
                             style: const TextStyle(
-                              color: Colors.teal,
+                              color: Colors.blue,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),
@@ -234,6 +235,13 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                          borderSide: const BorderSide(
+                            color: Colors.blue,
+                            width: 2,
+                          ),
                         ),
                       ),
                       onChanged: _onSearchChanged,
@@ -258,7 +266,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                         .map((doc) => doc.data() as Map<String, dynamic>)
                         .toList();
 
-                    // Rebuild dropdowns (same logic as above)
+                    // Rebuild dropdowns
                     final Set<String> deptSet = {}, bgSet = {}, sessSet = {};
                     for (var m in _allMembers) {
                       final d = m['department']?.toString();
@@ -269,13 +277,13 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                       if (s != null && s.isNotEmpty) sessSet.add(s);
                     }
 
-                    _departments = ['সব'] + deptSet.toList()
+                    _departments = ['All'] + deptSet.toList()
                       ..sort();
-                    _bloodGroups = ['সব'];
-                    _sessions = ['সব'];
+                    _bloodGroups = ['All'];
+                    _sessions = ['All'];
 
                     if (_selectedDepartment != null &&
-                        _selectedDepartment != 'সব') {
+                        _selectedDepartment != 'All') {
                       final filteredBG = <String>{};
                       final filteredSess = <String>{};
                       for (var m in _allMembers) {
@@ -286,10 +294,10 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                           if (s != null && s.isNotEmpty) filteredSess.add(s);
                         }
                       }
-                      _bloodGroups = ['সব'] + filteredBG.toList()
+                      _bloodGroups = ['All'] + filteredBG.toList()
                         ..sort();
                       if (_selectedBloodGroup != null &&
-                          _selectedBloodGroup != 'সব') {
+                          _selectedBloodGroup != 'All') {
                         final sessFinal = <String>{};
                         for (var m in _allMembers) {
                           if (m['department'] == _selectedDepartment &&
@@ -298,16 +306,16 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                             if (s != null && s.isNotEmpty) sessFinal.add(s);
                           }
                         }
-                        _sessions = ['সব'] + sessFinal.toList()
+                        _sessions = ['All'] + sessFinal.toList()
                           ..sort();
                       } else {
-                        _sessions = ['সব'] + filteredSess.toList()
+                        _sessions = ['All'] + filteredSess.toList()
                           ..sort();
                       }
                     } else {
-                      _bloodGroups = ['সব'] + bgSet.toList()
+                      _bloodGroups = ['All'] + bgSet.toList()
                         ..sort();
-                      _sessions = ['সব'] + sessSet.toList()
+                      _sessions = ['All'] + sessSet.toList()
                         ..sort();
                     }
 
@@ -318,15 +326,15 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                           _searchQuery.isEmpty || name.contains(_searchQuery);
                       final deptMatch =
                           _selectedDepartment == null ||
-                          _selectedDepartment == 'সব' ||
+                          _selectedDepartment == 'All' ||
                           m['department'] == _selectedDepartment;
                       final bgMatch =
                           _selectedBloodGroup == null ||
-                          _selectedBloodGroup == 'সব' ||
+                          _selectedBloodGroup == 'All' ||
                           m['bloodGroup'] == _selectedBloodGroup;
                       final sessMatch =
                           _selectedSession == null ||
-                          _selectedSession == 'সব' ||
+                          _selectedSession == 'All' ||
                           m['session'] == _selectedSession;
                       return matchesSearch && deptMatch && bgMatch && sessMatch;
                     }).toList();
@@ -339,9 +347,15 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                               child: DropdownButtonFormField<String>(
                                 value: _selectedDepartment,
                                 decoration: InputDecoration(
-                                  labelText: 'বিভাগ',
+                                  labelText: 'Department',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: Colors.blue,
+                                    ),
                                   ),
                                 ),
                                 items: _departments
@@ -355,8 +369,8 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                                 onChanged: (val) {
                                   setState(() {
                                     _selectedDepartment = val;
-                                    _selectedBloodGroup = 'সব';
-                                    _selectedSession = 'সব';
+                                    _selectedBloodGroup = 'All';
+                                    _selectedSession = 'All';
                                   });
                                   _updateFilters();
                                 },
@@ -367,9 +381,15 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                               child: DropdownButtonFormField<String>(
                                 value: _selectedBloodGroup,
                                 decoration: InputDecoration(
-                                  labelText: 'রক্তের গ্রুপ',
+                                  labelText: 'Blood Group',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: Colors.blue,
+                                    ),
                                   ),
                                 ),
                                 items: _bloodGroups
@@ -383,7 +403,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                                 onChanged: (val) {
                                   setState(() {
                                     _selectedBloodGroup = val;
-                                    _selectedSession = 'সব';
+                                    _selectedSession = 'All';
                                   });
                                   _updateFilters();
                                 },
@@ -394,9 +414,15 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                               child: DropdownButtonFormField<String>(
                                 value: _selectedSession,
                                 decoration: InputDecoration(
-                                  labelText: 'সেশন',
+                                  labelText: 'Session',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: Colors.blue,
+                                    ),
                                   ),
                                 ),
                                 items: _sessions
@@ -421,7 +447,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
 
                         // List with Serial Number
                         filteredMembers.isEmpty
-                            ? const Center(child: Text('কোন সদস্য মিলেনি'))
+                            ? const Center(child: Text('No members found'))
                             : ListView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -429,7 +455,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                                 itemBuilder: (context, index) {
                                   final member = filteredMembers[index];
                                   final name =
-                                      member['name'] ?? 'নাম পাওয়া যায়নি';
+                                      member['name'] ?? 'Name not found';
                                   final bloodGroup =
                                       member['bloodGroup'] ?? 'N/A';
                                   final mobileNumber =
@@ -443,7 +469,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                                     child: ListTile(
                                       // Serial Number
                                       leading: CircleAvatar(
-                                        backgroundColor: Colors.teal,
+                                        backgroundColor: Colors.blue,
                                         radius: 16,
                                         child: Text(
                                           '${index + 1}',
@@ -463,6 +489,9 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                                       ),
                                       subtitle: Text(
                                         'Blood Group: $bloodGroup',
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
                                       ),
                                       trailing: mobileNumber.isNotEmpty
                                           ? IconButton(

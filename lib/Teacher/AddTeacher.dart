@@ -156,6 +156,10 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
         prefixIcon: const Icon(Icons.school),
         suffixIcon: const Icon(Icons.arrow_drop_down),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.blue, width: 2),
+        ),
         hintText: 'বিভাগ নির্বাচন করুন',
       ),
       validator: (v) =>
@@ -185,6 +189,10 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.blue),
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12,
                             ),
@@ -213,6 +221,10 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                                   itemBuilder: (ctx, i) {
                                     final name = filtered[i]['name'].toString();
                                     return ListTile(
+                                      leading: const Icon(
+                                        Icons.school,
+                                        color: Colors.blue,
+                                      ),
                                       title: Text(
                                         name,
                                         style: const TextStyle(fontSize: 14),
@@ -274,7 +286,7 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
         'mobile': _mobileController.text.trim(),
         'address': _addressController.text.trim(),
         'bloodGroup': _selectedBloodGroup,
-        'socialMedia': socialLinks, // Array
+        'socialMedia': socialLinks,
         'somitiName': _somitiName,
         'addedByUid': user.uid,
         'addedByEmail': user.email,
@@ -309,7 +321,7 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('শিক্ষকের তথ্য যোগ করুন'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
       body: _isLoading
@@ -324,19 +336,19 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                     children: [
                       // Somiti (Auto)
                       Card(
-                        color: Colors.indigo.shade50,
+                        color: Colors.blue.shade50,
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              const Icon(Icons.groups, color: Colors.indigo),
+                              const Icon(Icons.groups, color: Colors.blue),
                               const SizedBox(width: 12),
                               Text(
                                 'সমিতি: $_somitiName',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.indigo,
+                                  color: Colors.blue,
                                 ),
                               ),
                             ],
@@ -348,11 +360,18 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                       // Name
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'নাম',
-                          prefixIcon: Icon(Icons.person),
+                          prefixIcon: const Icon(Icons.person),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.blue,
+                              width: 2,
+                            ),
                           ),
                         ),
                         validator: (v) =>
@@ -368,11 +387,18 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                       TextFormField(
                         controller: _mobileController,
                         keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'মোবাইল নম্বর',
-                          prefixIcon: Icon(Icons.phone),
+                          prefixIcon: const Icon(Icons.phone),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.blue,
+                              width: 2,
+                            ),
                           ),
                         ),
                         validator: (v) {
@@ -387,11 +413,18 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                       TextFormField(
                         controller: _addressController,
                         maxLines: 3,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'বর্তমান ঠিকানা',
-                          prefixIcon: Icon(Icons.location_on),
+                          prefixIcon: const Icon(Icons.location_on),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.blue,
+                              width: 2,
+                            ),
                           ),
                         ),
                         validator: (v) =>
@@ -402,11 +435,18 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                       // Blood Group
                       DropdownButtonFormField<String>(
                         value: _selectedBloodGroup,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'রক্তের গ্রুপ',
-                          prefixIcon: Icon(Icons.bloodtype),
+                          prefixIcon: const Icon(Icons.bloodtype),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.blue,
+                              width: 2,
+                            ),
                           ),
                         ),
                         items: _bloodGroups
@@ -464,6 +504,13 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Colors.blue,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                             keyboardType: TextInputType.url,
                             validator: (v) {
@@ -486,10 +533,12 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                         child: ElevatedButton(
                           onPressed: _isSubmitting ? null : _submitForm,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo,
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            elevation: 4,
                           ),
                           child: _isSubmitting
                               ? const Row(
@@ -514,7 +563,7 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                                   'শিক্ষক যোগ করুন',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                         ),

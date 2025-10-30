@@ -2,32 +2,29 @@ import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:ru_family/dashboard.dart' show SomitiDashboard;
-import 'package:ru_family/main.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class PasswordResetPage extends StatefulWidget {
+  const PasswordResetPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<PasswordResetPage> createState() => _PasswordResetPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _PasswordResetPageState extends State<PasswordResetPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
+  String? _successMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _signIn() async {
+  Future<void> _sendResetEmail() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -35,27 +32,32 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _successMessage = null;
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
       );
 
-      // On success, navigate to SomitiDashboard; it will fetch somitiName internally
+      setState(() {
+        _successMessage = 'পাসওয়ার্ড রিসেট ইমেইল পাঠানো হয়েছে! চেক করুন।';
+      });
+
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const SomitiDashboard()),
-          (route) => false,
-        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('লগইন সফল!'),
+            content: Text('পাসওয়ার্ড রিসেট ইমেইল পাঠানো হয়েছে!'),
             backgroundColor: Colors.green,
           ),
         );
+
+        // Pop back after success
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -74,18 +76,12 @@ class _LoginPageState extends State<LoginPage> {
 
   String _getAuthErrorMessage(String code) {
     switch (code) {
-      case 'user-not-found':
-        return 'কোনো অ্যাকাউন্ট এই ইমেইলে পাওয়া যায়নি।';
-      case 'wrong-password':
-        return 'ভুল পাসওয়ার্ড।';
       case 'invalid-email':
         return 'অবৈধ ইমেইল ঠিকানা।';
-      case 'user-disabled':
-        return 'এই অ্যাকাউন্ট নিষ্ক্রিয়।';
-      case 'too-many-requests':
-        return 'অনেকগুলি অনুরোধ। কিছুক্ষণ পর চেষ্টা করুন।';
+      case 'user-not-found':
+        return 'কোনো অ্যাকাউন্ট এই ইমেইলে পাওয়া যায়নি।';
       default:
-        return 'লগইন ত্রুটি: $code';
+        return 'ত্রুটি: $code';
     }
   }
 
@@ -94,7 +90,10 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green,
-        title: const Text('লগইন', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'পাসওয়ার্ড রিসেট',
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
       ),
       body: Padding(
@@ -104,15 +103,21 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.login, size: 100, color: Colors.green),
+              const Icon(Icons.lock_reset, size: 100, color: Colors.blue),
               const SizedBox(height: 20),
               const Text(
-                'আপনার অ্যাকাউন্টে লগইন করুন',
+                'পাসওয়ার্ড রিসেট করুন',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                 ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'আপনার ইমেইল লিখুন। রিসেট লিঙ্ক পাঠানো হবে।',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -140,47 +145,6 @@ class _LoginPageState extends State<LoginPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
-
-              // Password Field
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'পাসওয়ার্ড',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'পাসওয়ার্ড প্রয়োজনীয়।';
-                  }
-                  if (value.length < 6) {
-                    return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-
-              // Forgot Password
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PasswordResetPage(),
-                      ),
-                    );
-                  },
-                  child: const Text('পাসওয়ার্ড ভুলে গেছেন?'),
-                ),
-              ),
-
               const SizedBox(height: 24),
 
               if (_errorMessage != null)
@@ -197,14 +161,30 @@ class _LoginPageState extends State<LoginPage> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+              const SizedBox(height: 8),
+
+              if (_successMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Text(
+                    _successMessage!,
+                    style: TextStyle(color: Colors.green.shade700),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               const SizedBox(height: 16),
 
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _signIn,
+                  onPressed: _isLoading ? null : _sendResetEmail,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.blue,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -221,7 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         )
                       : const Text(
-                          'লগইন করুন',
+                          'রিসেট ইমেইল পাঠান',
                           style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
                 ),

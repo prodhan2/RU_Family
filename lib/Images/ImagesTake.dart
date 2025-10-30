@@ -30,7 +30,13 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
     super.initState();
     _urlsController.addListener(_updatePreview);
     _loadExistingFolders();
-    _loadCurrentUserName(); // NEW: Load name from members
+    _loadCurrentUserName();
+  }
+
+  // ==================== SAFE FIRST CHARACTER ====================
+  String getFirstChar(dynamic input) {
+    final str = input?.toString().trim() ?? '';
+    return str.isNotEmpty ? str[0].toUpperCase() : '?';
   }
 
   // ==================== LOAD USER NAME FROM members ====================
@@ -85,8 +91,9 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
       final Set<String> folders = {};
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data['folder'] != null && data['folder'] is String) {
-          folders.add(data['folder'] as String);
+        final folder = data['folder'];
+        if (folder != null && folder is String && folder.trim().isNotEmpty) {
+          folders.add(folder.trim());
         }
       }
 
@@ -129,9 +136,13 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
         title: const Text('Create New Folder'),
         content: TextField(
           controller: _folderController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Folder Name',
-            border: OutlineInputBorder(),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.blue),
+            ),
           ),
           autofocus: true,
         ),
@@ -154,6 +165,10 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
               }
               Navigator.pop(ctx);
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Create'),
           ),
         ],
@@ -179,7 +194,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
       return;
     }
 
-    if (_selectedFolder == null || _selectedFolder!.isEmpty) {
+    if (_selectedFolder == null || _selectedFolder!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select or create a folder')),
       );
@@ -194,31 +209,34 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
       await docRef.set({
         'imageUrls': urls,
         'somitiName': widget.somitiName,
-        'folder': _selectedFolder,
+        'folder': _selectedFolder!.trim(),
         'uploadedByEmail': _uploadedByEmail,
-        'uploadedByName': _uploadedByName, // CORRECT NAME FROM members
+        'uploadedByName': _uploadedByName,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${urls.length} image(s) uploaded by $_uploadedByName!',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${urls.length} image(s) uploaded by $_uploadedByName!',
+            ),
+            backgroundColor: Colors.green,
           ),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      Navigator.pop(context, true);
+        );
+        Navigator.pop(context, true);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Upload failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() => _uploading = false);
+      if (mounted) setState(() => _uploading = false);
     }
   }
 
@@ -234,14 +252,32 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Multiple Images'),
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
-              child: Text(
-                'By: $_uploadedByName',
-                style: const TextStyle(fontSize: 14, color: Colors.white70),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      getFirstChar(_uploadedByName),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _uploadedByName,
+                    style: const TextStyle(fontSize: 14, color: Colors.white70),
+                  ),
+                ],
               ),
             ),
           ),
@@ -266,6 +302,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: Colors.blue,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -274,15 +311,22 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                       '2. Upload all images\n'
                       '3. Copy Direct Links (one per line)\n'
                       '4. Paste below → Saved in one record',
-                      style: TextStyle(fontSize: 14),
+                      style: TextStyle(fontSize: 14, color: Colors.black87),
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: _openPostImages,
-                      icon: const Icon(Icons.open_in_browser),
+                      icon: const Icon(
+                        Icons.open_in_browser,
+                        color: Colors.white,
+                      ),
                       label: const Text('Open postimages.org'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ],
@@ -304,6 +348,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: Colors.blue,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -313,6 +358,10 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                         labelText: 'Folder',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.blue),
                         ),
                       ),
                       items: [
@@ -369,8 +418,12 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.blue, width: 2),
+                  ),
                   alignLabelWithHint: true,
-                  prefixIcon: const Icon(Icons.link),
+                  prefixIcon: const Icon(Icons.link, color: Colors.blue),
                 ),
                 style: const TextStyle(fontSize: 14),
               ),
@@ -384,7 +437,10 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                 children: [
                   Text(
                     'Preview (${_previewUrls.length} images)',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
@@ -420,6 +476,7 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                                   child: const Center(
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
+                                      color: Colors.blue,
                                     ),
                                   ),
                                 );
@@ -441,10 +498,12 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
               child: ElevatedButton(
                 onPressed: _uploading ? null : _uploadAsArray,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 4,
                 ),
                 child: _uploading
                     ? const Row(
@@ -464,7 +523,10 @@ class _AddImageGalleryPageState extends State<AddImageGalleryPage> {
                       )
                     : Text(
                         'Save ${_previewUrls.length} Images',
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),

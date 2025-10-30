@@ -22,7 +22,7 @@ class MemberDetailsPage extends StatelessWidget {
     final font = await PdfGoogleFonts.openSansRegular();
     final boldFont = await PdfGoogleFonts.openSansBold();
 
-    final name = memberData['name'] ?? 'নাম পাওয়া যায়নি';
+    final name = memberData['name'] ?? 'Name not found';
     final bloodGroup = memberData['bloodGroup'] ?? 'N/A';
     final email = memberData['email'] ?? 'N/A';
     final hall = memberData['hall'] ?? 'N/A';
@@ -61,28 +61,28 @@ class MemberDetailsPage extends StatelessWidget {
               child: pw.Column(
                 children: [
                   pw.Text(
-                    'RU Somiti Manager',
+                    'RUConnect+ app',
                     style: pw.TextStyle(
                       font: boldFont,
                       fontSize: 28,
-                      color: PdfColors.teal,
+                      color: PdfColors.blue,
                     ),
                   ),
                   pw.SizedBox(height: 6),
                   pw.Text(
-                    'সদস্য প্রোফাইল',
+                    'Member Profile',
                     style: pw.TextStyle(font: boldFont, fontSize: 18),
                   ),
                   pw.SizedBox(height: 4),
                   pw.Text(
-                    'তৈরি: $currentDateTime',
+                    'Generated: $currentDateTime',
                     style: pw.TextStyle(
                       font: font,
                       fontSize: 12,
                       color: PdfColors.grey700,
                     ),
                   ),
-                  pw.Divider(thickness: 2, color: PdfColors.teal),
+                  pw.Divider(thickness: 2, color: PdfColors.blue),
                 ],
               ),
             ),
@@ -95,7 +95,7 @@ class MemberDetailsPage extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: const pw.BoxDecoration(
-                    color: PdfColors.teal100,
+                    color: PdfColors.blue100,
                     shape: pw.BoxShape.circle,
                   ),
                   child: pw.Center(
@@ -104,7 +104,7 @@ class MemberDetailsPage extends StatelessWidget {
                       style: pw.TextStyle(
                         font: boldFont,
                         fontSize: 36,
-                        color: PdfColors.teal700,
+                        color: PdfColors.blue700,
                       ),
                     ),
                   ),
@@ -128,7 +128,7 @@ class MemberDetailsPage extends StatelessWidget {
                           ),
                           pw.SizedBox(width: 6),
                           pw.Text(
-                            'রক্তের গ্রুপ: $bloodGroup',
+                            'Blood Group: $bloodGroup',
                             style: pw.TextStyle(
                               font: boldFont,
                               fontSize: 15,
@@ -151,18 +151,18 @@ class MemberDetailsPage extends StatelessWidget {
                 1: const pw.FlexColumnWidth(3),
               },
               children: [
-                _pdfRow('সমিতি', somitiName, font, boldFont),
-                _pdfRow('বিশ্ববিদ্যালয় আইডি', universityId, font, boldFont),
-                _pdfRow('সেশন', session, font, boldFont),
-                _pdfRow('হল', hall, font, boldFont),
-                _pdfRow('বিভাগ', department, font, boldFont),
-                _pdfRow('ইমেইল', email, font, boldFont),
-                _pdfRow('মোবাইল', mobileNumber, font, boldFont),
-                _pdfRow('জরুরি যোগাযোগ', emergencyContact, font, boldFont),
-                _pdfRow('সোশ্যাল মিডিয়া', socialMediaId, font, boldFont),
-                _pdfRow('বর্তমান ঠিকানা', presentAddress, font, boldFont),
-                _pdfRow('স্থায়ী ঠিকানা', permanentAddress, font, boldFont),
-                _pdfRow('নিবন্ধনের তারিখ', createdAt, font, boldFont),
+                _pdfRow('Somiti', somitiName, font, boldFont),
+                _pdfRow('University ID', universityId, font, boldFont),
+                _pdfRow('Session', session, font, boldFont),
+                _pdfRow('Hall', hall, font, boldFont),
+                _pdfRow('Department', department, font, boldFont),
+                _pdfRow('Email', email, font, boldFont),
+                _pdfRow('Mobile', mobileNumber, font, boldFont),
+                _pdfRow('Emergency Contact', emergencyContact, font, boldFont),
+                _pdfRow('Social Media', socialMediaId, font, boldFont),
+                _pdfRow('Present Address', presentAddress, font, boldFont),
+                _pdfRow('Permanent Address', permanentAddress, font, boldFont),
+                _pdfRow('Registration Date', createdAt, font, boldFont),
               ],
             ),
 
@@ -222,14 +222,10 @@ class MemberDetailsPage extends StatelessWidget {
 
       if (kIsWeb) {
         // Web: Direct download
-        await Printing.layoutPdf(
-          onLayout: (_) => pdfData,
-          name: fileName,
-          // Web-এ sharePdf() কাজ করে না, তাই layoutPdf দিয়ে ডাউনলোড
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF ডাউনলোড শুরু হয়েছে!')),
-        );
+        await Printing.layoutPdf(onLayout: (_) => pdfData, name: fileName);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('PDF download started!')));
       } else {
         // Android/iOS: Save + Share
         final dir = await getTemporaryDirectory();
@@ -241,7 +237,7 @@ class MemberDetailsPage extends StatelessWidget {
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('PDF তৈরি করতে সমস্যা: $e')));
+      ).showSnackBar(SnackBar(content: Text('PDF generation error: $e')));
     }
   }
 
@@ -250,7 +246,7 @@ class MemberDetailsPage extends StatelessWidget {
   // ==============================================
   @override
   Widget build(BuildContext context) {
-    final name = memberData['name'] ?? 'নাম পাওয়া যায়নি';
+    final name = memberData['name'] ?? 'Name not found';
     final bloodGroup = memberData['bloodGroup'] ?? 'N/A';
     final email = memberData['email'] ?? 'N/A';
     final hall = memberData['hall'] ?? 'N/A';
@@ -282,30 +278,47 @@ class MemberDetailsPage extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // Save PDF
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-            tooltip: 'PDF ডাউনলোড/শেয়ার করুন',
-            onPressed: () => _saveAndSharePdf(context),
+          // PDF Button (Blue BG + Border)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.blue,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.shade700, width: 2),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+              tooltip: 'Download/Share PDF',
+              onPressed: () => _saveAndSharePdf(context),
+            ),
           ),
-          // Print
-          IconButton(
-            icon: const Icon(Icons.print, color: Colors.white),
-            tooltip: 'প্রিন্ট করুন',
-            onPressed: () async {
-              final pdfData = await _generatePdf();
-              await Printing.layoutPdf(
-                onLayout: (_) => pdfData,
-                name: 'Member_$name.pdf',
-              );
-            },
+
+          // Print Button (Blue BG + Border)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.blue,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.shade700, width: 2),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.print, color: Colors.white),
+              tooltip: 'Print',
+              onPressed: () async {
+                final pdfData = await _generatePdf();
+                await Printing.layoutPdf(
+                  onLayout: (_) => pdfData,
+                  name: 'Member_${name.replaceAll(' ', '_')}.pdf',
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -325,13 +338,13 @@ class MemberDetailsPage extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 44,
-                      backgroundColor: Colors.teal.shade50,
+                      backgroundColor: Colors.blue.shade50,
                       child: Text(
                         name.isNotEmpty ? name[0].toUpperCase() : '?',
                         style: TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade700,
+                          color: Colors.blue.shade700,
                         ),
                       ),
                     ),
@@ -372,37 +385,37 @@ class MemberDetailsPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 28),
-                const Divider(thickness: 1.8, color: Colors.teal),
+                const Divider(thickness: 1.8, color: Colors.blue),
                 const SizedBox(height: 16),
 
-                _buildInfoRow(Icons.groups, 'সমিতি', somitiName),
-                _buildInfoRow(
-                  Icons.school,
-                  'বিশ্ববিদ্যালয় আইডি',
-                  universityId,
-                ),
-                _buildInfoRow(Icons.calendar_today, 'সেশন', session),
-                _buildInfoRow(Icons.home, 'হল', hall),
-                _buildInfoRow(Icons.book, 'বিভাগ', department),
-                _buildInfoRow(Icons.email, 'ইমেইল', email),
-                _buildInfoRow(Icons.phone, 'মোবাইল', mobileNumber),
+                _buildInfoRow(Icons.groups, 'Somiti', somitiName),
+                _buildInfoRow(Icons.school, 'University ID', universityId),
+                _buildInfoRow(Icons.calendar_today, 'Session', session),
+                _buildInfoRow(Icons.home, 'Hall', hall),
+                _buildInfoRow(Icons.book, 'Department', department),
+                _buildInfoRow(Icons.email, 'Email', email),
+                _buildInfoRow(Icons.phone, 'Mobile', mobileNumber),
                 _buildInfoRow(
                   Icons.security,
-                  'জরুরি যোগাযোগ',
+                  'Emergency Contact',
                   emergencyContact,
                 ),
-                _buildInfoRow(Icons.share, 'সোশ্যাল মিডিয়া', socialMediaId),
+                _buildInfoRow(Icons.share, 'Social Media', socialMediaId),
                 _buildInfoRow(
                   Icons.location_on,
-                  'বর্তমান ঠিকানা',
+                  'Present Address',
                   presentAddress,
                 ),
                 _buildInfoRow(
                   Icons.location_city,
-                  'স্থায়ী ঠিকানা',
+                  'Permanent Address',
                   permanentAddress,
                 ),
-                _buildInfoRow(Icons.access_time, 'নিবন্ধনের তারিখ', createdAt),
+                _buildInfoRow(
+                  Icons.access_time,
+                  'Registration Date',
+                  createdAt,
+                ),
               ],
             ),
           ),
@@ -417,7 +430,7 @@ class MemberDetailsPage extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.teal, size: 22),
+          Icon(icon, color: Colors.blue, size: 22),
           const SizedBox(width: 12),
           Expanded(
             flex: 2,

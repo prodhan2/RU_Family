@@ -2,7 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:ru_family/AddTeacher.dart';
+import 'package:ru_family/Teacher/AddTeacher.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// ---------------------------------------------------------------
@@ -21,7 +21,8 @@ class TeachersBySomitiPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('আমার সমিতির শিক্ষক'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
       // FAB Button
       floatingActionButton: FloatingActionButton(
@@ -31,7 +32,7 @@ class TeachersBySomitiPage extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const AddTeacherInfoPage()),
           );
         },
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.blue,
         child: const Icon(Icons.person_add, color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -101,13 +102,13 @@ class TeachersBySomitiPage extends StatelessWidget {
                             // Avatar
                             CircleAvatar(
                               radius: 28,
-                              backgroundColor: Colors.deepPurple.shade100,
+                              backgroundColor: Colors.blue.shade50,
                               child: Text(
                                 name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.deepPurple,
+                                  color: Colors.blue.shade700,
                                 ),
                               ),
                             ),
@@ -191,7 +192,7 @@ class TeacherDetailsPage extends StatelessWidget {
     final String blood = teacherData['bloodGroup'] ?? 'N/A';
     final String address = teacherData['address'] ?? 'N/A';
     final String addedBy = teacherData['addedByEmail'] ?? 'N/A';
-    final String somitiName = teacherData['somitiName'] ?? 'N/A'; // NEW FIELD
+    final String somitiName = teacherData['somitiName'] ?? 'N/A';
     final List<dynamic> social = teacherData['socialMedia'] ?? [];
     final Timestamp? ts = teacherData['createdAt'];
     final String date = ts != null
@@ -199,7 +200,11 @@ class TeacherDetailsPage extends StatelessWidget {
         : 'N/A';
 
     return Scaffold(
-      appBar: AppBar(title: Text(name), backgroundColor: Colors.deepPurple),
+      appBar: AppBar(
+        title: Text(name),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Card(
@@ -217,12 +222,13 @@ class TeacherDetailsPage extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 40,
-                      backgroundColor: Colors.deepPurple.shade100,
+                      backgroundColor: Colors.blue.shade50,
                       child: Text(
                         name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 32,
-                          color: Colors.deepPurple,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
                         ),
                       ),
                     ),
@@ -255,25 +261,37 @@ class TeacherDetailsPage extends StatelessWidget {
                         label: const Text('কল'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
                       ),
                   ],
                 ),
-                const Divider(height: 32),
+                const Divider(height: 32, color: Colors.blue),
 
                 // Info rows
                 _infoRow('মোবাইল', mobile),
                 _infoRow('রক্তের গ্রুপ', blood),
                 _infoRow('ঠিকানা', address),
                 _infoRow('যোগ করেছেন', addedBy),
-                _infoRow('সমিতি', somitiName), // NEW ROW
+                _infoRow('সমিতি', somitiName),
                 _infoRow('যোগের তারিখ', date),
 
                 if (social.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const Text(
                     'সোশ্যাল মিডিয়া:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.blue,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   ...social.map(
@@ -286,6 +304,7 @@ class TeacherDetailsPage extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.blue,
                             decoration: TextDecoration.underline,
+                            fontSize: 14,
                           ),
                         ),
                       ),
@@ -310,10 +329,15 @@ class TeacherDetailsPage extends StatelessWidget {
             width: 110,
             child: Text(
               '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(value, style: const TextStyle(color: Colors.black87)),
+          ),
         ],
       ),
     );
