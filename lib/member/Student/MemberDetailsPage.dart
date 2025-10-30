@@ -1,5 +1,6 @@
+// lib/member_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart'; // <-- for kIsWeb
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -15,7 +16,7 @@ class MemberDetailsPage extends StatelessWidget {
   const MemberDetailsPage({super.key, required this.memberData});
 
   // ==============================================
-  // Generate PDF (Universal)
+  // Generate PDF
   // ==============================================
   Future<Uint8List> _generatePdf() async {
     final pdf = pw.Document();
@@ -87,7 +88,6 @@ class MemberDetailsPage extends StatelessWidget {
               ),
             ),
             pw.SizedBox(height: 24),
-
             pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -143,7 +143,6 @@ class MemberDetailsPage extends StatelessWidget {
               ],
             ),
             pw.SizedBox(height: 28),
-
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300, width: 1),
               columnWidths: {
@@ -165,9 +164,7 @@ class MemberDetailsPage extends StatelessWidget {
                 _pdfRow('Registration Date', createdAt, font, boldFont),
               ],
             ),
-
             pw.Spacer(),
-
             pw.Align(
               alignment: pw.Alignment.center,
               child: pw.Text(
@@ -211,9 +208,6 @@ class MemberDetailsPage extends StatelessWidget {
     );
   }
 
-  // ==============================================
-  // Save & Share PDF (Platform Aware)
-  // ==============================================
   Future<void> _saveAndSharePdf(BuildContext context) async {
     try {
       final pdfData = await _generatePdf();
@@ -221,29 +215,23 @@ class MemberDetailsPage extends StatelessWidget {
           'Member_${memberData['name']?.replaceAll(' ', '_') ?? 'Profile'}.pdf';
 
       if (kIsWeb) {
-        // Web: Direct download
         await Printing.layoutPdf(onLayout: (_) => pdfData, name: fileName);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('PDF download started!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF ডাউনলোড শুরু হয়েছে!')),
+        );
       } else {
-        // Android/iOS: Save + Share
         final dir = await getTemporaryDirectory();
         final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(pdfData);
-
         await Printing.sharePdf(bytes: pdfData, filename: fileName);
       }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('PDF generation error: $e')));
+      ).showSnackBar(SnackBar(content: Text('PDF তৈরি করতে সমস্যা: $e')));
     }
   }
 
-  // ==============================================
-  // UI Build
-  // ==============================================
   @override
   Widget build(BuildContext context) {
     final name = memberData['name'] ?? 'Name not found';
@@ -278,39 +266,42 @@ class MemberDetailsPage extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // PDF Button (Blue BG + Border)
+          // PDF Button
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Colors.blue,
+              color: Colors.blue.shade700,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade700, width: 2),
+              border: Border.all(color: Colors.white, width: 1.5),
             ),
             child: IconButton(
-              icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-              tooltip: 'Download/Share PDF',
+              icon: const Icon(
+                Icons.picture_as_pdf,
+                color: Colors.white,
+                size: 20,
+              ),
+              tooltip: 'PDF ডাউনলোড/শেয়ার',
               onPressed: () => _saveAndSharePdf(context),
             ),
           ),
-
-          // Print Button (Blue BG + Border)
+          // Print Button
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: Colors.blue,
+              color: Colors.blue.shade700,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade700, width: 2),
+              border: Border.all(color: Colors.white, width: 1.5),
             ),
             child: IconButton(
-              icon: const Icon(Icons.print, color: Colors.white),
-              tooltip: 'Print',
+              icon: const Icon(Icons.print, color: Colors.white, size: 20),
+              tooltip: 'প্রিন্ট',
               onPressed: () async {
                 final pdfData = await _generatePdf();
                 await Printing.layoutPdf(
@@ -322,132 +313,161 @@ class MemberDetailsPage extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Card(
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue.shade50, Colors.white],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 44,
-                      backgroundColor: Colors.blue.shade50,
-                      child: Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Profile Header
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.blue.shade100,
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.bloodtype,
+                              color: Colors.red,
+                              size: 22,
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.bloodtype,
+                            const SizedBox(width: 6),
+                            Text(
+                              bloodGroup,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.red,
-                                size: 20,
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                bloodGroup,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                const Divider(thickness: 1.8, color: Colors.blue),
-                const SizedBox(height: 16),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
 
-                _buildInfoRow(Icons.groups, 'Somiti', somitiName),
-                _buildInfoRow(Icons.school, 'University ID', universityId),
-                _buildInfoRow(Icons.calendar_today, 'Session', session),
-                _buildInfoRow(Icons.home, 'Hall', hall),
-                _buildInfoRow(Icons.book, 'Department', department),
-                _buildInfoRow(Icons.email, 'Email', email),
-                _buildInfoRow(Icons.phone, 'Mobile', mobileNumber),
-                _buildInfoRow(
-                  Icons.security,
-                  'Emergency Contact',
-                  emergencyContact,
+              // Info List – Full Width, No Card
+              _buildInfoTile(Icons.groups, 'সমিতি', somitiName),
+              _buildInfoTile(Icons.school, 'ইউনিভার্সিটি আইডি', universityId),
+              _buildInfoTile(Icons.calendar_today, 'সেশন', session),
+              _buildInfoTile(Icons.home, 'হল', hall),
+              _buildInfoTile(Icons.book, 'বিভাগ', department),
+              _buildInfoTile(Icons.email, 'ইমেইল', email),
+              _buildInfoTile(Icons.phone, 'মোবাইল', mobileNumber),
+              _buildInfoTile(
+                Icons.security,
+                'ইমার্জেন্সি কন্টাক্ট',
+                emergencyContact,
+              ),
+              _buildInfoTile(Icons.share, 'সোশ্যাল মিডিয়া', socialMediaId),
+              _buildInfoTile(
+                Icons.location_on,
+                'বর্তমান ঠিকানা',
+                presentAddress,
+              ),
+              _buildInfoTile(
+                Icons.location_city,
+                'স্থায়ী ঠিকানা',
+                permanentAddress,
+              ),
+              _buildInfoTile(Icons.access_time, 'যোগের তারিখ', createdAt),
+
+              const SizedBox(height: 40),
+              Center(
+                child: Text(
+                  'Powered by RU Somiti Manager',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
-                _buildInfoRow(Icons.share, 'Social Media', socialMediaId),
-                _buildInfoRow(
-                  Icons.location_on,
-                  'Present Address',
-                  presentAddress,
-                ),
-                _buildInfoRow(
-                  Icons.location_city,
-                  'Permanent Address',
-                  permanentAddress,
-                ),
-                _buildInfoRow(
-                  Icons.access_time,
-                  'Registration Date',
-                  createdAt,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.blue, size: 22),
-          const SizedBox(width: 12),
+          Icon(icon, color: Colors.blue.shade700, size: 26),
+          const SizedBox(width: 16),
           Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 16, color: Colors.black54),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

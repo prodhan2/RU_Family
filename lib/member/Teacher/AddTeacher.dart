@@ -1,4 +1,4 @@
-// AddTeacherInfoPage.dart
+// lib/Teacher/AddTeacherInfoPage.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,7 +6,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class AddTeacherInfoPage extends StatefulWidget {
-  const AddTeacherInfoPage({super.key});
+  final Map<String, dynamic>? existingData;
+  final String? docId;
+
+  const AddTeacherInfoPage({super.key, this.existingData, this.docId});
 
   @override
   State<AddTeacherInfoPage> createState() => _AddTeacherInfoPageState();
@@ -14,9 +17,9 @@ class AddTeacherInfoPage extends StatefulWidget {
 
 class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _mobileController = TextEditingController();
-  final _addressController = TextEditingController();
+  late TextEditingController _nameController;
+  late TextEditingController _mobileController;
+  late TextEditingController _addressController;
 
   String? _selectedDepartment;
   String? _selectedBloodGroup;
@@ -43,8 +46,29 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
   @override
   void initState() {
     super.initState();
+    _initializeControllers();
     _loadUserSomitiAndDept();
-    _addSocialField(); // Initial field
+    _addSocialField(); // প্রথম ফিল্ড
+  }
+
+  void _initializeControllers() {
+    final data = widget.existingData ?? {};
+    _nameController = TextEditingController(text: data['name'] ?? '');
+    _mobileController = TextEditingController(text: data['mobile'] ?? '');
+    _addressController = TextEditingController(text: data['address'] ?? '');
+    _selectedDepartment = data['department'];
+    _selectedBloodGroup = data['bloodGroup'];
+    final List<dynamic> social = data['socialMedia'] ?? [];
+    if (social.isNotEmpty) {
+      _socialControllers.clear();
+      _socialFocusNodes.clear();
+      for (var link in social) {
+        final ctrl = TextEditingController(text: link);
+        final focus = FocusNode();
+        _socialControllers.add(ctrl);
+        _socialFocusNodes.add(focus);
+      }
+    }
   }
 
   @override
@@ -180,7 +204,6 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                     height: 400,
                     child: Column(
                       children: [
-                        // Search Box
                         TextField(
                           autofocus: true,
                           decoration: InputDecoration(
@@ -210,7 +233,6 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        // List
                         Expanded(
                           child: filtered.isEmpty
                               ? const Center(
@@ -257,7 +279,7 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
     );
   }
 
-  // ==================== SUBMIT FORM ====================
+  // ==================== SUBMIT / UPDATE FORM ====================
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate() ||
         _selectedDepartment == null ||
@@ -280,7 +302,7 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
 
     try {
       final user = FirebaseAuth.instance.currentUser!;
-      await FirebaseFirestore.instance.collection('teachers').add({
+      final teacherData = {
         'name': _nameController.text.trim(),
         'department': _selectedDepartment,
         'mobile': _mobileController.text.trim(),
@@ -290,13 +312,32 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
         'somitiName': _somitiName,
         'addedByUid': user.uid,
         'addedByEmail': user.email,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        'createdAt': widget.existingData == null
+            ? FieldValue.serverTimestamp()
+            : widget.existingData!['createdAt'],
+      };
+
+      if (widget.docId == null) {
+        // নতুন যোগ
+        await FirebaseFirestore.instance
+            .collection('teachers')
+            .add(teacherData);
+      } else {
+        // আপডেট
+        await FirebaseFirestore.instance
+            .collection('teachers')
+            .doc(widget.docId)
+            .update(teacherData);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('শিক্ষকের তথ্য সফলভাবে যোগ করা হয়েছে!'),
+          SnackBar(
+            content: Text(
+              widget.docId == null
+                  ? 'শিক্ষকের তথ্য সফলভাবে যোগ করা হয়েছে!'
+                  : 'শিক্ষকের তথ্য আপডেট করা হয়েছে!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -318,9 +359,13 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditMode = widget.docId != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('শিক্ষকের তথ্য যোগ করুন'),
+        title: Text(
+          isEditMode ? 'শিক্ষকের তথ্য এডিট করুন' : 'শিক্ষকের তথ্য যোগ করুন',
+        ),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
@@ -379,7 +424,7 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Department (Searchable Dialog)
+                      // Department
                       _buildDepartmentField(),
                       const SizedBox(height: 16),
 
@@ -559,9 +604,9 @@ class _AddTeacherInfoPageState extends State<AddTeacherInfoPage> {
                                     ),
                                   ],
                                 )
-                              : const Text(
-                                  'শিক্ষক যোগ করুন',
-                                  style: TextStyle(
+                              : Text(
+                                  isEditMode ? 'আপডেট করুন' : 'শিক্ষক যোগ করুন',
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),

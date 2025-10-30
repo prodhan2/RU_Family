@@ -2,16 +2,25 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:ru_family/AdminPages/admindadhboard.dart';
+import 'package:RUConnect_plus/AdminPages/admindadhboard.dart';
 import 'dart:async';
 
-import 'package:ru_family/dashboard.dart'; // SomitiDashboard
-import 'package:ru_family/firebase_options.dart';
-import 'package:ru_family/somitiPage.dart'; // মেইন পেজ
+import 'package:RUConnect_plus/member/dashboard.dart'; // SomitiDashboard
+import 'package:RUConnect_plus/firebase_options.dart';
+import 'package:RUConnect_plus/somitiPage.dart'; // মেইন পেজ
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase initialize
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // ✅ Enable Firestore Offline Persistence
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true, // <-- Enable offline data
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED, // Optional: unlimited cache
+  );
+
   runApp(const MyApp());
 }
 
@@ -22,7 +31,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'সমিতি অ্যাপ',
+      title: 'RUConnect+',
       theme: ThemeData(
         primarySwatch: Colors.blue, // ← নীল থিম
         fontFamily: 'Roboto',

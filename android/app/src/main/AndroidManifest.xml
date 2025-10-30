@@ -6,7 +6,7 @@
 
     <application
     
-        android:label="ru_family"
+        android:label="RUConnect+"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

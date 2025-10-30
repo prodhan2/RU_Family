@@ -1,4 +1,4 @@
-name: ru_family
+name: RUConnect_plus
 description: "A new Flutter project."
 publish_to: 'none'
 
@@ -33,6 +33,10 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.14.2
   google_fonts: ^6.3.2
+  flutter_html: ^3.0.0
+  flutter_markdown: ^0.7.7+1
+  rename: ^3.1.0
+  
 
 dev_dependencies:
   flutter_test:

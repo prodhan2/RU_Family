@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ru_family/dashboard.dart'; // Make sure this is SomitiDashboard
+import 'package:RUConnect_plus/member/dashboard.dart'; // Make sure this is SomitiDashboard
 
 class MemberRegistrationPage extends StatefulWidget {
   const MemberRegistrationPage({super.key});
