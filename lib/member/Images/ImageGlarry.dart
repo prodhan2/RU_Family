@@ -20,7 +20,7 @@ class ImageGalleryPageview extends StatefulWidget {
   State<ImageGalleryPageview> createState() => _ImageGalleryPageviewState();
 }
 
-// Custom cache manager for images (7-day stale, validate on use)
+// Custom cache manager for images (7-day stale, validate on use) - Optimized for web with larger cache
 class GalleryCacheManager extends CacheManager {
   static const key = 'galleryCacheKey';
   static final GalleryCacheManager _instance = GalleryCacheManager._();
@@ -32,11 +32,84 @@ class GalleryCacheManager extends CacheManager {
         Config(
           key,
           stalePeriod: const Duration(days: 7),
-          maxNrOfCacheObjects: 200, // Adjust based on gallery size
+          maxNrOfCacheObjects:
+              500, // Increased for web to handle more images in memory
           repo: JsonCacheInfoRepository(databaseName: key),
           fileService: HttpFileService(),
         ),
       );
+}
+
+// Simple shimmer placeholder widget for fast-feeling loading
+class ShimmerPlaceholder extends StatefulWidget {
+  const ShimmerPlaceholder({Key? key}) : super(key: key);
+
+  @override
+  State<ShimmerPlaceholder> createState() => _ShimmerPlaceholderState();
+}
+
+class _ShimmerPlaceholderState extends State<ShimmerPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _shimmerController;
+  late Animation<Alignment> _shimmerAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 1200,
+      ), // Faster animation for snappier feel
+    );
+    _shimmerAnimation =
+        Tween<Alignment>(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).animate(
+          CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
+        );
+    _shimmerController.repeat();
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: AnimatedBuilder(
+        animation: _shimmerAnimation,
+        builder: (context, child) {
+          return Align(
+            alignment: _shimmerAnimation.value,
+            child: Container(
+              width: 80, // Fixed shimmer bar width for consistent animation
+              height: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Colors.grey[100]!,
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
@@ -126,7 +199,11 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
       }
     });
 
-    _loadImages();
+    if (currentUserUid != null && currentUserEmail != null) {
+      _loadImages();
+    } else {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -135,7 +212,7 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
     super.dispose();
   }
 
-  // ==================== LOAD ALL IMAGES FOR THIS SOMITI (CLIENT-SIDE SORT) ====================
+  // ==================== LOAD ALL IMAGES FOR THIS SOMITI (CLIENT-SIDE FILTER/SORT) ====================
   Future<void> _loadImages() async {
     if (currentUserUid == null || currentUserEmail == null) {
       setState(() => isLoading = false);
@@ -145,11 +222,11 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
     setState(() => isLoading = true);
 
     try {
-      // No orderBy - avoids index. Limit to prevent huge loads (adjust as needed)
+      // No orderBy or additional where - avoids index. High limit to fetch most (adjust as needed)
       final snapshot = await FirebaseFirestore.instance
           .collection('images')
           .where('somitiName', isEqualTo: widget.somitiName)
-          .limit(200) // Safety limit; remove if you want all
+          .limit(500) // Safety limit; increase if more expected
           .get();
 
       Map<String, List<ImageItem>> tempFolders = {};
@@ -297,61 +374,65 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
 
   // ==================== FILTER DATA ====================
   void _updateFilteredData() {
-    List<ImageItem> tempImages = List.from(allImages); // Use allImages now
+    if (viewMode == 'all') {
+      List<ImageItem> tempImages = List.from(allImages);
 
-    if (selectedFolder != 'All') {
-      tempImages = tempImages.where((i) => i.folder == selectedFolder).toList();
-    }
+      if (selectedFolder != 'All') {
+        tempImages = tempImages
+            .where((i) => i.folder == selectedFolder)
+            .toList();
+      }
 
-    if (searchQuery.isNotEmpty) {
-      tempImages = tempImages
-          .where(
-            (i) =>
-                i.uploadedByName.toLowerCase().contains(
+      if (filterRange != null) {
+        final start = DateTime(
+          filterRange!.start.year,
+          filterRange!.start.month,
+          filterRange!.start.day,
+        );
+        final end = DateTime(
+          filterRange!.end.year,
+          filterRange!.end.month,
+          filterRange!.end.day,
+        ).add(const Duration(days: 1)).subtract(const Duration(seconds: 1));
+
+        tempImages = tempImages.where((i) {
+          final d = i.createdAt.toDate();
+          return d.isAfter(start.subtract(const Duration(milliseconds: 1))) &&
+              d.isBefore(end.add(const Duration(milliseconds: 1)));
+        }).toList();
+      }
+
+      if (searchQuery.isNotEmpty) {
+        tempImages = tempImages
+            .where(
+              (i) =>
+                  i.uploadedByName.toLowerCase().contains(
+                    searchQuery.toLowerCase(),
+                  ) ||
+                  i.url.toLowerCase().contains(searchQuery.toLowerCase()),
+            )
+            .toList();
+      }
+
+      // Ensure sorted after filter
+      tempImages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _filteredImages = tempImages;
+    } else {
+      List<String> tempFolders = List.from(folders);
+      if (searchQuery.isNotEmpty) {
+        tempFolders = tempFolders.where((f) {
+          final imgs = folderImages[f]!;
+          return imgs.any(
+            (img) =>
+                img.uploadedByName.toLowerCase().contains(
                   searchQuery.toLowerCase(),
                 ) ||
-                i.url.toLowerCase().contains(searchQuery.toLowerCase()),
-          )
-          .toList();
+                f.toLowerCase().contains(searchQuery.toLowerCase()),
+          );
+        }).toList();
+      }
+      _filteredFolders = tempFolders;
     }
-
-    if (filterRange != null) {
-      final start = DateTime(
-        filterRange!.start.year,
-        filterRange!.start.month,
-        filterRange!.start.day,
-      );
-      final end = DateTime(
-        filterRange!.end.year,
-        filterRange!.end.month,
-        filterRange!.end.day,
-      ).add(const Duration(days: 1)).subtract(const Duration(seconds: 1));
-
-      tempImages = tempImages.where((i) {
-        final d = i.createdAt.toDate();
-        return d.isAfter(start.subtract(const Duration(milliseconds: 1))) &&
-            d.isBefore(end.add(const Duration(milliseconds: 1)));
-      }).toList();
-    }
-
-    // Ensure sorted after filter
-    tempImages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    _filteredImages = tempImages;
-
-    List<String> tempFolders = List.from(folders);
-    if (searchQuery.isNotEmpty && viewMode == 'folders') {
-      tempFolders = tempFolders.where((f) {
-        final imgs = folderImages[f]!;
-        return imgs.any(
-          (img) =>
-              img.uploadedByName.toLowerCase().contains(
-                searchQuery.toLowerCase(),
-              ) ||
-              f.toLowerCase().contains(searchQuery.toLowerCase()),
-        );
-      }).toList();
-    }
-    _filteredFolders = tempFolders;
   }
 
   @override
@@ -927,15 +1008,9 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        ),
+                        // Use shimmer for faster perceived loading
+                        placeholder: (context, url) =>
+                            const ShimmerPlaceholder(),
                         errorWidget: (context, url, error) => Container(
                           color: Colors.grey[200],
                           child: const Icon(Icons.error, color: Colors.red),
@@ -1102,15 +1177,9 @@ class _ImageGalleryPageviewState extends State<ImageGalleryPageview> {
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                            ),
+                            // Use shimmer for faster perceived loading
+                            placeholder: (context, url) =>
+                                const ShimmerPlaceholder(),
                             errorWidget: (context, url, error) => Container(
                               color: Colors.grey[200],
                               child: const Icon(
@@ -1275,22 +1344,23 @@ class FolderDetailPage extends StatelessWidget {
                     },
                     child: Hero(
                       tag: 'image_${item.docId}_$index',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: item.url,
+                          cacheManager: GalleryCacheManager(),
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          // Use shimmer for faster perceived loading
+                          placeholder: (context, url) =>
+                              const ShimmerPlaceholder(),
+                          errorWidget: (context, url, error) => Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ],
-                          image: DecorationImage(
-                            image: CachedNetworkImageProvider(
-                              item.url,
-                              cacheManager: GalleryCacheManager(),
-                            ),
-                            fit: BoxFit.cover,
+                            child: const Icon(Icons.error, color: Colors.red),
                           ),
                         ),
                       ),
@@ -1378,8 +1448,13 @@ class _FullScreenImageCarouselState extends State<FullScreenImageCarousel> {
                   ),
                   minScale: PhotoViewComputedScale.contained,
                   maxScale: PhotoViewComputedScale.covered * 3,
-                  loadingBuilder: (_, __) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                  // Use shimmer for full-screen loading (scaled to full)
+                  loadingBuilder: (context, event) => const Center(
+                    child: SizedBox(
+                      width: 200,
+                      height: 200,
+                      child: ShimmerPlaceholder(),
+                    ),
                   ),
                 ),
               );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 
 void main() {
   runApp(const RUConnectUpdatesApp());
@@ -23,6 +24,43 @@ class RUConnectUpdatesApp extends StatelessWidget {
         fontFamily: GoogleFonts.notoSansBengali().fontFamily,
       ),
       home: const UpdatesPage(),
+    );
+  }
+}
+
+// ==================== SHIMMER LINE WIDGET ====================
+class ShimmerLine extends StatelessWidget {
+  final double? width;
+  final double height;
+  final EdgeInsets? margin;
+  final BorderRadius? borderRadius;
+  final Color? baseColor;
+  final Color? highlightColor;
+
+  const ShimmerLine({
+    super.key,
+    this.width,
+    this.height = 16,
+    this.margin,
+    this.borderRadius,
+    this.baseColor,
+    this.highlightColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: baseColor ?? Colors.grey[300]!,
+      highlightColor: highlightColor ?? Colors.grey[100]!,
+      child: Container(
+        width: width,
+        height: height,
+        margin: margin,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: borderRadius ?? BorderRadius.circular(4),
+        ),
+      ),
     );
   }
 }
@@ -206,6 +244,84 @@ class _UpdatesPageState extends State<UpdatesPage> {
     return map[name.toLowerCase().trim()] ?? Colors.blue;
   }
 
+  // ==================== SHIMMER CARD ====================
+  Widget _buildShimmerCard() {
+    return Card(
+      elevation: 8,
+      shadowColor: Colors.grey.withOpacity(0.2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: [
+              Colors.grey[100]!.withOpacity(0.5),
+              Colors.white.withOpacity(0.8),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const ShimmerLine(height: 20),
+                      const SizedBox(height: 4),
+                      const ShimmerLine(width: 120, height: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const ShimmerLine(height: 14),
+                const SizedBox(height: 6),
+                const ShimmerLine(height: 14),
+                const SizedBox(height: 6),
+                const ShimmerLine(width: 200, height: 14),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const ShimmerLine(width: 80, height: 16),
+                const ShimmerLine(width: 100, height: 16),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ==================== UI BUILD ====================
   @override
   Widget build(BuildContext context) {
@@ -243,7 +359,7 @@ class _UpdatesPageState extends State<UpdatesPage> {
       body: RefreshIndicator(
         onRefresh: () => fetchUpdates(isPullToRefresh: true),
         child: loading
-            ? _buildLoading()
+            ? _buildLoading(isWeb)
             : error != null && updates.isEmpty
             ? _buildError()
             : _buildUpdateList(isWeb),
@@ -251,16 +367,62 @@ class _UpdatesPageState extends State<UpdatesPage> {
     );
   }
 
-  Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(strokeWidth: 3),
-          SizedBox(height: 16),
-          Text('আপডেট লোড হচ্ছে...', style: TextStyle(color: Colors.grey)),
-        ],
-      ),
+  Widget _buildLoading(bool isWeb) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(isWeb ? 40 : 20),
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: isWeb ? 40 : 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const ShimmerLine(height: 20, width: 250),
+                  const SizedBox(height: 8),
+                  const ShimmerLine(height: 16, width: 200),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: isWeb ? 40 : 16),
+          sliver: isWeb
+              ? SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 24,
+                    mainAxisSpacing: 24,
+                    childAspectRatio: 1.4,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildShimmerCard(),
+                    childCount: 6, // Even number for better grid layout
+                  ),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildShimmerCard(),
+                    ),
+                    childCount: 5,
+                  ),
+                ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
     );
   }
 

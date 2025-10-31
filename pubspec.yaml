@@ -37,6 +37,7 @@ dependencies:
   flutter_markdown: ^0.7.7+1
   rename: ^3.1.0
   excel: ^4.0.6
+  marquee: ^2.3.0
   
 
 dev_dependencies:
@@ -49,6 +50,7 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/images/banner.png
 
   fonts:
     - family: CustomBangla1

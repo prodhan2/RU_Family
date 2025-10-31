@@ -1,4 +1,5 @@
 // somiti_page.dart
+import 'package:RUConnect_plus/BStoreApp/categorypage.dart';
 import 'package:RUConnect_plus/help.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,10 +9,302 @@ import 'package:RUConnect_plus/MakeSomiti/somitiCreate.dart';
 import 'package:RUConnect_plus/UpdatedPages/update.dart';
 import 'package:RUConnect_plus/member/memberRegistrationpage.dart';
 
+// Custom Shimmer Widget for fast perceived loading
+class ShimmerLine extends StatefulWidget {
+  final double widthFactor;
+  final double height;
+
+  const ShimmerLine({Key? key, this.widthFactor = 1.0, this.height = 16.0})
+    : super(key: key);
+
+  @override
+  State<ShimmerLine> createState() => _ShimmerLineState();
+}
+
+class _ShimmerLineState extends State<ShimmerLine>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: -0.5,
+      end: 1.5,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return AnimatedBuilder(
+          animation: _animation,
+          builder: (context, child) {
+            final shimmerPosition = _animation.value * constraints.maxWidth;
+            return Container(
+              width: double.infinity,
+              height: widget.height,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: widget.height,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.grey[300]!,
+                          Colors.grey[100]!,
+                          Colors.grey[300]!,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: shimmerPosition,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class ShimmerImagePlaceholder extends StatefulWidget {
+  final double width;
+  final double height;
+
+  const ShimmerImagePlaceholder({Key? key, this.width = 140, this.height = 140})
+    : super(key: key);
+
+  @override
+  State<ShimmerImagePlaceholder> createState() =>
+      _ShimmerImagePlaceholderState();
+}
+
+class _ShimmerImagePlaceholderState extends State<ShimmerImagePlaceholder>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: -0.5,
+      end: 1.5,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Stack(
+            children: [
+              Container(
+                width: widget.width,
+                height: widget.height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.grey[300]!,
+                      Colors.grey[100]!,
+                      Colors.grey[300]!,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: _animation.value * widget.width,
+                top: _animation.value * widget.height,
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class ShimmerButton extends StatefulWidget {
+  final double height;
+  final double widthFactor;
+
+  const ShimmerButton({Key? key, this.height = 54, this.widthFactor = 1.0})
+    : super(key: key);
+
+  @override
+  State<ShimmerButton> createState() => _ShimmerButtonState();
+}
+
+class _ShimmerButtonState extends State<ShimmerButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: -0.5,
+      end: 1.5,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return AnimatedBuilder(
+          animation: _animation,
+          builder: (context, child) {
+            final shimmerPosition = _animation.value * constraints.maxWidth;
+            return Container(
+              width: double.infinity,
+              height: widget.height,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.grey[300]!,
+                          Colors.grey[100]!,
+                          Colors.grey[300]!,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: shimmerPosition,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 80,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 // 🔧 Demo Page (Replace with your real admin/demo screen later)
 
-class SomitiPage extends StatelessWidget {
+class SomitiPage extends StatefulWidget {
   const SomitiPage({super.key});
+
+  @override
+  State<SomitiPage> createState() => _SomitiPageState();
+}
+
+class _SomitiPageState extends State<SomitiPage> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulate fast load with short delay for shimmer effect (adjust as needed)
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +343,24 @@ class SomitiPage extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
+          // 🛍️ RUStore button
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => CategoryPage()),
+              );
+            },
+            child: const Text(
+              "RUStore",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
           // 👉 Admin icon in top-right
           IconButton(
             icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
@@ -64,10 +375,96 @@ class SomitiPage extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: isWeb ? _buildWebLayout(context) : _buildMobileLayout(context),
+
+      body: _isLoading
+          ? isWeb
+                ? _buildWebShimmerLayout(context)
+                : _buildMobileShimmerLayout(context)
+          : isWeb
+          ? _buildWebLayout(context)
+          : _buildMobileLayout(context),
     );
   }
 
+  // ==================== SHIMMER LAYOUTS ====================
+  Widget _buildWebShimmerLayout(BuildContext context) {
+    return Row(
+      children: [
+        // Left: Shimmer for logo
+        Expanded(
+          flex: 2,
+          child: Container(
+            color: Colors.blue.shade50,
+            padding: const EdgeInsets.all(50),
+            child: const Center(
+              child: ShimmerImagePlaceholder(width: 200, height: 200),
+            ),
+          ),
+        ),
+        // Right: Shimmer content
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(60),
+            child: _buildShimmerContent(context, isWeb: true),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileShimmerLayout(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Shimmer Logo
+          const Center(child: ShimmerImagePlaceholder()),
+          const SizedBox(height: 16),
+
+          // Shimmer Welcome Text
+          const ShimmerLine(height: 24, widthFactor: 0.8),
+          const SizedBox(height: 24),
+
+          // Shimmer Buttons
+          _buildShimmerButtonSection(context, isWeb: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerContent(BuildContext context, {required bool isWeb}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ShimmerLine(height: 40, widthFactor: 0.6),
+        const SizedBox(height: 12),
+        ShimmerLine(height: 24, widthFactor: 0.8),
+        const SizedBox(height: 40),
+        _buildShimmerButtonSection(context, isWeb: isWeb),
+      ],
+    );
+  }
+
+  Widget _buildShimmerButtonSection(
+    BuildContext context, {
+    required bool isWeb,
+  }) {
+    return Column(
+      children: [
+        ShimmerButton(height: isWeb ? 64 : 54),
+        const SizedBox(height: 14),
+        ShimmerButton(height: isWeb ? 64 : 54),
+        const SizedBox(height: 14),
+        ShimmerButton(height: isWeb ? 64 : 54),
+        const SizedBox(height: 14),
+        ShimmerButton(height: isWeb ? 64 : 54),
+      ],
+    );
+  }
+
+  // ==================== ORIGINAL LAYOUTS (Non-Shimmer) ====================
   // ==================== WEB LAYOUT ====================
   Widget _buildWebLayout(BuildContext context) {
     return Row(
