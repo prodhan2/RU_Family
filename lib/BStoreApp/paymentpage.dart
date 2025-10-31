@@ -1,11 +1,9 @@
-// ---------------- PAYMENT PAGE (LOGIN REQUIRED → FIREBASE SAVE) ----------------
+// ---------------- PAYMENT PAGE (NO LOGIN, NO FIREBASE) ----------------
 import 'dart:convert';
 import 'package:RUConnect_plus/BStoreApp/cardManager.dart';
-import 'package:RUConnect_plus/BStoreApp/login.dart';
+import 'package:RUConnect_plus/BStoreApp/categorypage.dart';
 import 'package:RUConnect_plus/BStoreApp/shippingrules.dart' show ShippingRule;
 import 'package:RUConnect_plus/BStoreApp/storeapp.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -42,7 +40,6 @@ class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _transactionController = TextEditingController();
   final TextEditingController _streetController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
-
   bool _isProcessing = false;
 
   @override
@@ -59,7 +56,6 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   Widget build(BuildContext context) {
     final subtotal = widget.totalPrice - widget.shippingCharge;
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1565C0),
@@ -328,6 +324,38 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
+  // FIXED: proper lowerCamelCase name and correct parameters
+  Widget _buildPaymentMethod(
+    String value,
+    String title,
+    IconData icon,
+    Color color,
+  ) {
+    return ListTile(
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(
+        title,
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+      ),
+      trailing: Radio(
+        value: value,
+        groupValue: _selectedPaymentMethod,
+        onChanged: (val) => setState(() => _selectedPaymentMethod = val!),
+        activeColor: const Color(0xFFF85606),
+      ),
+      onTap: () => setState(() => _selectedPaymentMethod = value),
+    );
+  }
+
   Widget _buildWalletDetails() {
     return _InfoCard(
       title: 'Payment Details',
@@ -444,37 +472,6 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPaymentMethod(
-    String value,
-    String title,
-    IconData icon,
-    Color color,
-  ) {
-    return ListTile(
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Icon(icon, color: color),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-      ),
-      trailing: Radio<String>(
-        value: value,
-        groupValue: _selectedPaymentMethod,
-        onChanged: (val) => setState(() => _selectedPaymentMethod = val!),
-        activeColor: const Color(0xFFF85606),
-      ),
-      onTap: () => setState(() => _selectedPaymentMethod = value),
     );
   }
 
@@ -645,10 +642,10 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   // ===================================================================
-  // ========================= CONFIRM PAYMENT (LOGIN + FIREBASE) =========================
+  // ========================= CONFIRM PAYMENT (NO LOGIN, NO FIREBASE) =========================
   // ===================================================================
   void _confirmPayment() async {
-    // Validation
+    // ---- Validation ----
     if (_phoneController.text.trim().length != 11 ||
         !_phoneController.text.startsWith('01')) {
       _showError('Valid 11-digit phone number required');
@@ -665,206 +662,326 @@ class _PaymentPageState extends State<PaymentPage> {
       }
     }
 
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
-      if (result != true || FirebaseAuth.instance.currentUser == null) {
-        _showError('অর্ডার করতে লগইন প্রয়োজন');
-        return;
-      }
-    }
-
     setState(() => _isProcessing = true);
-    try {
-      await _saveToFirebase();
-      if (widget.products != null) CartManager().clearCart();
-      _showOrderSuccessDialog();
-    } catch (e) {
-      _showError('অর্ডার সেভ করতে সমস্যা: $e');
-    } finally {
-      setState(() => _isProcessing = false);
+
+    // Small fake delay (optional)
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // Clear cart locally
+    if (widget.products != null) {
+      CartManager().clearCart();
     }
+
+    setState(() => _isProcessing = false);
+
+    // Show success dialog
+    _showOrderSuccessDialog();
   }
 
   // ===================================================================
-  // ========================= SAVE TO FIREBASE =========================
+  // ========================= SUCCESS DIALOG (SMART UI + MESSAGING) =========================
   // ===================================================================
-  Future<void> _saveToFirebase() async {
-    final user = FirebaseAuth.instance.currentUser!;
-    final items = <Map<String, dynamic>>[];
-
-    if (widget.product != null) {
-      final p = widget.product!;
-      final price =
-          double.tryParse(p.price.replaceAll(RegExp(r'[৳,]'), '')) ?? 0;
-      final discount = double.tryParse(p.discount) ?? 0;
-      final qty = widget.quantity ?? 1;
-      items.add({
-        'productId': p.id,
-        'name': p.name,
-        'quantity': qty,
-        'price': price * (1 - discount / 100) * qty,
-        'image': p.image,
-      });
-    } else if (widget.products != null) {
-      for (var item in widget.products!) {
-        final price =
-            double.tryParse(
-              item.product.price.replaceAll(RegExp(r'[৳,]'), ''),
-            ) ??
-            0;
-        final discount = double.tryParse(item.product.discount) ?? 0;
-        items.add({
-          'productId': item.product.id,
-          'name': item.product.name,
-          'quantity': item.quantity,
-          'price': price * (1 - discount / 100) * item.quantity,
-          'image': item.product.image,
-        });
-      }
-    }
-
-    final paymentDetails =
-        _selectedPaymentMethod != 'cod' && _selectedPaymentMethod != 'card'
-        ? {
-            'mobileNumber': _phoneController.text.trim(),
-            'transactionId': _transactionController.text.trim(),
-          }
-        : {};
-
-    await FirebaseFirestore.instance.collection('orders').add({
-      'userId': user.uid,
-      'userEmail': user.email,
-      'userPhone': _phoneController.text.trim(),
-      'userAddress':
-          '${_streetController.text.trim()}, ${_areaController.text.trim()}',
-      'deliveryArea': _areaController.text.trim(),
-      'shippingCharge': widget.shippingCharge,
-      'paymentMethod': _selectedPaymentMethod,
-      'paymentMethodName': _getPaymentMethodName(_selectedPaymentMethod),
-      'totalPrice': widget.totalPrice,
-      'status': 'confirmed',
-      'createdAt': FieldValue.serverTimestamp(),
-      'items': items,
-      ...paymentDetails,
-    });
-  }
-
   // ===================================================================
-  // ========================= SUCCESS DIALOG ==========================
+  // ========================= SUCCESS DIALOG (PROFESSIONAL CARD + DATE + NAV TO CategoryPage) =========================
+  // ===================================================================
+  // ===================================================================
+  // ========================= SUCCESS DIALOG (WITH TRANSACTION ID + DATE + NAV TO CategoryPage) =========================
+  // ===================================================================
+  // ===================================================================
+  // ========================= SUCCESS DIALOG (ক্লোজ বাটন + সব ক্লিকে মেসেজ + CategoryPage) =========================
   // ===================================================================
   void _showOrderSuccessDialog() {
+    final now = DateTime.now();
+    final formattedDate = '${now.day}/${now.month}/${now.year}';
+
     final itemsText = widget.product != null
         ? '${widget.product!.name} × ${widget.quantity ?? 1}'
         : widget.products!
               .map((e) => '${e.product.name} × ${e.quantity}')
               .join(', ');
 
+    final transactionLine =
+        (_selectedPaymentMethod != 'cod' && _selectedPaymentMethod != 'card')
+        ? _transactionController.text.trim().isNotEmpty
+              ? '\n*ট্রানজেকশন আইডি:* ${_transactionController.text.trim()}'
+              : ''
+        : '';
+
+    final orderMessage =
+        '''
+*নতুন অর্ডার!*
+
+*তারিখ:* $formattedDate
+*পণ্য:* $itemsText
+*মোট টাকা:* ৳${widget.totalPrice.toStringAsFixed(2)}$transactionLine
+*ডেলিভারি এরিয়া:* ${widget.shippingArea}
+*পুরো ঠিকানা:* ${_streetController.text.trim()}
+*ফোন নম্বর:* +880 ${_phoneController.text.trim()}
+*পেমেন্ট মেথড:* ${_getPaymentMethodName(_selectedPaymentMethod)}
+'''
+            .trim();
+
+    final encodedMsg = Uri.encodeComponent(orderMessage);
+
+    // সব ক্লিকে মেসেজ পাঠানো + CategoryPage এ যাওয়া
+    void _sendAndNavigate(String url) async {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          Navigator.pop(context); // ডায়লগ বন্ধ
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => CategoryPage()),
+          );
+        }
+      });
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green),
-            const SizedBox(width: 8),
-            Text(
-              'অর্ডার সফল!',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 16,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text.rich(
-                TextSpan(
+              // হেডার + ক্লোজ বাটন
+              Stack(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF85606),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'অর্ডার সফল!',
+                        style: GoogleFonts.poppins(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1565C0),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // ক্লোজ বাটন (X)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => _sendAndNavigate(
+                        'https://m.me/prodhan2?text=$encodedMsg',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // সারাংশ কার্ড
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const TextSpan(
-                      text: 'ধন্যবাদ! আপনার অর্ডার Firebase এ সেভ হয়েছে।\n\n',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const TextSpan(
-                      text: 'পণ্য:\n',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    TextSpan(
-                      text: '$itemsText\n\n',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    TextSpan(
-                      text: 'মোট: ৳${widget.totalPrice.toStringAsFixed(2)}\n',
-                      style: const TextStyle(
+                    _summaryRow('তারিখ', formattedDate),
+                    _summaryRow('পণ্য', itemsText),
+                    _summaryRow(
+                      'মোট টাকা',
+                      '৳${widget.totalPrice.toStringAsFixed(2)}',
+                      valueStyle: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFF85606),
                       ),
                     ),
-                    TextSpan(
-                      text: 'ডেলিভারি: ${_areaController.text}\n',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    TextSpan(
-                      text: 'ঠিকানা: ${_streetController.text}\n',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    TextSpan(
-                      text: 'ফোন: +880 ${_phoneController.text}\n',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    TextSpan(
-                      text:
-                          'পেমেন্ট: ${_getPaymentMethodName(_selectedPaymentMethod)}\n\n',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const TextSpan(
-                      text:
-                          'শীঘ্রই যোগাযোগ করা হবে।\nকোনো সমস্যা হলে মেসেজ করুন: ',
-                      style: TextStyle(fontSize: 13),
+                    if (_selectedPaymentMethod != 'cod' &&
+                        _selectedPaymentMethod != 'card' &&
+                        _transactionController.text.trim().isNotEmpty)
+                      _summaryRow(
+                        'ট্রানজেকশন আইডি',
+                        _transactionController.text.trim(),
+                      ),
+                    _summaryRow('ডেলিভারি', _areaController.text),
+                    _summaryRow('ঠিকানা', _streetController.text.trim()),
+                    _summaryRow('ফোন', '+880 ${_phoneController.text.trim()}'),
+                    _summaryRow(
+                      'পেমেন্ট',
+                      _getPaymentMethodName(_selectedPaymentMethod),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              ElevatedButton.icon(
+              const SizedBox(height: 24),
+
+              // মেসেজ পাঠানোর বাটন
+              _contactButton(
+                label: 'মেসেঞ্জারে পাঠান',
                 icon: Image.network(
                   'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Facebook_Messenger_logo_2020.svg/512px-Facebook_Messenger_logo_2020.svg.png',
-                  width: 20,
-                  height: 20,
+                  width: 24,
+                  height: 24,
                 ),
-                label: const Text('মেসেজ করুন'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0084FF),
-                  foregroundColor: Colors.white,
+                onPressed: () =>
+                    _sendAndNavigate('https://m.me/prodhan2?text=$encodedMsg'),
+              ),
+              const SizedBox(height: 10),
+              _contactButton(
+                label: 'হোয়াটসঅ্যাপে পাঠান',
+                icon: const Icon(Icons.message, color: Colors.white),
+                onPressed: () => _sendAndNavigate(
+                  'https://wa.me/8801902383808?text=$encodedMsg',
                 ),
-                onPressed: () async {
-                  final url = Uri.parse('https://m.me/prodhan2');
-                  if (await canLaunchUrl(url))
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
-                },
+              ),
+              const SizedBox(height: 10),
+              _contactButton(
+                label: 'টেলিগ্রামে পাঠান',
+                icon: const Icon(Icons.send, color: Colors.white),
+                onPressed: () => _sendAndNavigate(
+                  'https://t.me/Sujanprodhan?text=$encodedMsg',
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // অ্যাকশন বাটন
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1565C0),
+                        side: const BorderSide(color: Color(0xFF1565C0)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => _sendAndNavigate(
+                        'https://m.me/prodhan2?text=$encodedMsg',
+                      ),
+                      child: const Text(
+                        'হোম',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF85606),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => _sendAndNavigate(
+                        'https://m.me/prodhan2?text=$encodedMsg',
+                      ),
+                      child: const Text(
+                        'ট্র্যাক অর্ডার',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: const Text('হোম'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF85606),
+      ),
+    );
+  }
+
+  // Helper: Navigate to CategoryPage and close dialog
+  void _navigateToCategoryPage() {
+    Navigator.pop(context); // close dialog
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => CategoryPage()),
+    );
+  }
+
+  // Helper widgets for dialog
+  Widget _summaryRow(String label, String value, {TextStyle? valueStyle}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
             ),
-            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: const Text('ট্র্যাক অর্ডার'),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style:
+                  valueStyle ??
+                  GoogleFonts.poppins(color: Colors.black87, fontSize: 13),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _contactButton({
+    required String label,
+    required Widget icon,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF1565C0),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        icon: icon,
+        label: Text(
+          label,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        onPressed: onPressed,
       ),
     );
   }
