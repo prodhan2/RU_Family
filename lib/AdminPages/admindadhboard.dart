@@ -2,7 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:RUConnect_plus/Images/ImageGlarry.dart';
+import 'package:RUConnect_plus/member/Images/ImageGlarry.dart';
 import 'package:RUConnect_plus/member/Student/MemberDetailsPage.dart';
 import 'package:RUConnect_plus/member/Teacher/TeachersDisplay.dart';
 import 'package:RUConnect_plus/somitiPage.dart';

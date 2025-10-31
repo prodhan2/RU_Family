@@ -1,7 +1,13 @@
 // lib/Student/MySomitiMembersNameList.dart
+import 'dart:typed_data';
+import 'package:RUConnect_plus/member/Student/pdfsettingPage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // For date formatting
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:RUConnect_plus/member/Student/MemberDetailsPage.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,25 +20,20 @@ class MySomitiMembersNameList extends StatefulWidget {
 }
 
 class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
-  // ----------  USER & SOMITI ----------
   String? _somitiName;
   bool _isLoading = true;
 
-  // ----------  FILTERS ----------
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
   String? _selectedDepartment;
   String? _selectedBloodGroup;
   String? _selectedSession;
 
-  // ----------  DROPDOWN LISTS ----------
   List<String> _departments = ['All'];
   List<String> _bloodGroups = ['All'];
   List<String> _sessions = ['All'];
 
-  // ----------  CACHE ----------
-  List<Map<String, dynamic>> _allMembers = []; // Full list from Firestore
+  List<Map<String, dynamic>> _allMembers = [];
   List<Map<String, dynamic>> _filteredMembers = [];
 
   @override
@@ -50,9 +51,6 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
     super.dispose();
   }
 
-  // -----------------------------------------------------------------
-  //  1. Load Somiti name (cache-first)
-  // -----------------------------------------------------------------
   Future<void> _loadSomitiName() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -92,17 +90,11 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
     }
   }
 
-  // -----------------------------------------------------------------
-  //  2. Phone call
-  // -----------------------------------------------------------------
   Future<void> _makePhoneCall(String phone) async {
     final uri = Uri(scheme: 'tel', path: phone);
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
-  // -----------------------------------------------------------------
-  //  3. Update dropdowns based on current filters
-  // -----------------------------------------------------------------
   void _updateDropdowns() {
     final deptSet = <String>{};
     final bgSet = <String>{};
@@ -118,46 +110,10 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
       if (s != null && s.isNotEmpty) sessSet.add(s);
     }
 
-    // Base lists
     _departments = ['All', ...deptSet.toList()..sort()];
-    _bloodGroups = ['All'];
-    _sessions = ['All'];
+    _bloodGroups = ['All', ...bgSet.toList()..sort()];
+    _sessions = ['All', ...sessSet.toList()..sort()];
 
-    // Cascade: Dept → Blood → Session
-    if (_selectedDepartment != null && _selectedDepartment != 'All') {
-      final filteredBG = <String>{};
-      final filteredSess = <String>{};
-
-      for (var m in _allMembers) {
-        if (m['department'] == _selectedDepartment) {
-          final b = m['bloodGroup']?.toString();
-          final s = m['session']?.toString();
-          if (b != null && b.isNotEmpty) filteredBG.add(b);
-          if (s != null && s.isNotEmpty) filteredSess.add(s);
-        }
-      }
-
-      _bloodGroups = ['All', ...filteredBG.toList()..sort()];
-
-      if (_selectedBloodGroup != null && _selectedBloodGroup != 'All') {
-        final finalSess = <String>{};
-        for (var m in _allMembers) {
-          if (m['department'] == _selectedDepartment &&
-              m['bloodGroup'] == _selectedBloodGroup) {
-            final s = m['session']?.toString();
-            if (s != null && s.isNotEmpty) finalSess.add(s);
-          }
-        }
-        _sessions = ['All', ...finalSess.toList()..sort()];
-      } else {
-        _sessions = ['All', ...filteredSess.toList()..sort()];
-      }
-    } else {
-      _bloodGroups = ['All', ...bgSet.toList()..sort()];
-      _sessions = ['All', ...sessSet.toList()..sort()];
-    }
-
-    // Reset invalid selections
     if (!_departments.contains(_selectedDepartment))
       _selectedDepartment = 'All';
     if (!_bloodGroups.contains(_selectedBloodGroup))
@@ -165,9 +121,6 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
     if (!_sessions.contains(_selectedSession)) _selectedSession = 'All';
   }
 
-  // -----------------------------------------------------------------
-  //  4. Filter members
-  // -----------------------------------------------------------------
   void _applyFilters() {
     _filteredMembers = _allMembers.where((m) {
       final name = (m['name'] ?? '').toString().toLowerCase();
@@ -192,9 +145,101 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
     }).toList();
   }
 
-  // -----------------------------------------------------------------
-  //  5. UI
-  // -----------------------------------------------------------------
+  // Helper: Format Timestamp
+  String _formatTimestamp(dynamic ts) {
+    if (ts == null) return 'N/A';
+    if (ts is Timestamp) {
+      final date = ts.toDate();
+      return DateFormat('MMMM d, yyyy – h:mm a').format(date);
+    }
+    return ts.toString();
+  }
+
+  Future<void> _generatePdf(
+    BuildContext context,
+    List<String> selectedFields,
+    List<Map<String, dynamic>> members,
+  ) async {
+    final pdf = pw.Document();
+    final fieldLabels = {
+      'name': 'Name',
+      'bloodGroup': 'Blood Group',
+      'mobileNumber': 'Mobile',
+      'department': 'Department',
+      'session': 'Session',
+      'email': 'Email',
+      'emergencyContact': 'Emergency Contact',
+      'hall': 'Hall',
+      'permanentAddress': 'Permanent Address',
+      'presentAddress': 'Present Address',
+      'socialMediaId': 'Social Media',
+      'universityId': 'University ID',
+      'somitiName': 'Somiti',
+      'createdAt': 'Registered At',
+    };
+
+    final tableHeaders = <pw.Widget>[];
+    final tableData = <List<pw.Widget>>[];
+
+    for (final field in selectedFields) {
+      tableHeaders.add(
+        pw.Text(
+          fieldLabels[field] ?? field,
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+      );
+    }
+
+    for (final member in members) {
+      final row = <pw.Widget>[];
+      for (final field in selectedFields) {
+        String value = 'N/A';
+        if (field == 'createdAt') {
+          value = _formatTimestamp(member['createdAt']);
+        } else {
+          value = (member[field]?.toString() ?? 'N/A');
+        }
+        row.add(pw.Text(value, maxLines: 2));
+      }
+      tableData.add(row);
+    }
+
+    pdf.addPage(
+      pw.Page(
+        margin: pw.EdgeInsets.all(20),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              '$_somitiName Members List',
+              style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text(
+              'Generated on: ${DateFormat('yMMMMd').format(DateTime.now())}',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+            ),
+            pw.SizedBox(height: 20),
+            // ignore: deprecated_member_use
+            pw.Table.fromTextArray(
+              headers: tableHeaders.map((e) => e.toString()).toList(),
+              data: tableData, // List<List<String>>
+              border: pw.TableBorder.all(width: 0.5),
+              tableWidth: pw.TableWidth.max,
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              cellStyle: pw.TextStyle(fontSize: 12),
+              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+              cellAlignment: pw.Alignment.centerLeft,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final output = await pdf.save();
+    await Printing.layoutPdf(onLayout: (format) async => output);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -210,6 +255,23 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
         title: Text('$_somitiName Members'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          // Inside build() → AppBar actions
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PdfSettingsPage(
+                    members: _filteredMembers,
+                    somitiName: _somitiName ?? 'Somiti',
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -225,10 +287,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // Update full member list
                 _allMembers = snapshot.data!.docs.map((d) => d.data()).toList();
-
-                // Rebuild dropdowns + filters
                 _updateDropdowns();
                 _applyFilters();
 
@@ -303,9 +362,6 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
     );
   }
 
-  // -----------------------------------------------------------------
-  //  6. Search + Filter UI
-  // -----------------------------------------------------------------
   Widget _buildSearchAndFilters() {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -412,3 +468,7 @@ class _MySomitiMembersNameListState extends State<MySomitiMembersNameList> {
     );
   }
 }
+
+// ---------------------------------------------------------------------
+// PDF Settings Page – FULL FIELD SUPPORT
+// ---------------------------------------------------------------------

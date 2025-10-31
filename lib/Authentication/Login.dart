@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:RUConnect_plus/AdminPages/admindadhboard.dart';
-import 'package:RUConnect_plus/passwordreset.dart';
+import 'package:RUConnect_plus/Authentication/passwordreset.dart';
 import 'package:RUConnect_plus/member/dashboard.dart' show SomitiDashboard;
 
 class LoginPage extends StatefulWidget {
