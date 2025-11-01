@@ -1,4 +1,5 @@
 // somiti_page.dart
+import 'package:RUConnect_plus/AdminPages/AdminPro.dart';
 import 'package:RUConnect_plus/BStoreApp/categorypage.dart';
 import 'package:RUConnect_plus/Pdf_resources.dart';
 import 'package:RUConnect_plus/RUPaymentPage.dart';
@@ -481,7 +482,11 @@ class _SomitiPageState extends State<SomitiPage> {
         icon: Icons.bloodtype,
         page: const RUBloodPage(),
       ),
-      _DrawerItem(title: 'About', icon: Icons.people, page: const AboutPage()),
+      _DrawerItem(
+        title: 'About',
+        icon: Icons.people,
+        page: const AppMakerAdmin(),
+      ),
       _DrawerItem(title: 'Login', icon: Icons.login, page: const LoginPage()),
       _DrawerItem(title: 'Logout', icon: Icons.logout, page: null),
     ];
