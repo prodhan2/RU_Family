@@ -4,6 +4,7 @@ import 'package:RUConnect_plus/Pdf_resources.dart';
 import 'package:RUConnect_plus/RUPaymentPage.dart';
 import 'package:RUConnect_plus/RU_Medical.dart';
 import 'package:RUConnect_plus/RU_info.dart';
+import 'package:RUConnect_plus/ResourcesLibrary/GoogeDriveLibrary/drive.dart';
 import 'package:RUConnect_plus/Ru_blood.dart';
 import 'package:RUConnect_plus/ShimmerImagePlaceholder.dart';
 import 'package:RUConnect_plus/help.dart';
@@ -462,7 +463,7 @@ class _SomitiPageState extends State<SomitiPage> {
       _DrawerItem(
         title: 'PDF_Resources',
         icon: Icons.picture_as_pdf,
-        page: const PDFResourcesPage(),
+        page: const DriveExplorerScreen(),
       ),
       _DrawerItem(
         title: 'RU_Payment',

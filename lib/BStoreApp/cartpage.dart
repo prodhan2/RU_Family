@@ -40,7 +40,7 @@ class _CartPageState extends State<CartPage> {
       setState(() => _isLoadingRules = true);
       final response = await http.get(
         Uri.parse(
-          'https://opensheet.elk.sh/1h9IjXUaHQatLTduaFU0f7U3F1q1YnhhYMyoleuGgiOQ/4',
+          'https://opensheet.elk.sh/14GLDraTX_xFp5XG-YBRE9Bmj4meQBk85qbVnMAuFVR0/4',
         ),
       );
 

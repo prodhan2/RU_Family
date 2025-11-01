@@ -29,11 +29,11 @@ class _CategoryPageState extends State<CategoryPage> {
   bool showSearchResults = false;
   String searchQuery = '';
   bool dataLoaded = false;
+  String noticeText = '';
 
-  // Pagination
+  // Pagination for Infinite Scroll
   int _currentPage = 0;
   final int _itemsPerPage = 20;
-  bool _hasMoreItems = true;
   bool _loadingMore = false;
   final ScrollController _scrollController = ScrollController();
 
@@ -42,6 +42,7 @@ class _CategoryPageState extends State<CategoryPage> {
   final String categoryUrl = 'https://opensheet.elk.sh/$_sheetId/1';
   final String productUrl = 'https://opensheet.elk.sh/$_sheetId/2';
   final String bannerUrl = 'https://opensheet.elk.sh/$_sheetId/3';
+  final String noticeUrl = 'https://opensheet.elk.sh/$_sheetId/5';
 
   final PageController _pageController = PageController(viewportFraction: 0.9);
   int _currentBannerPage = 0;
@@ -52,10 +53,6 @@ class _CategoryPageState extends State<CategoryPage> {
   // Responsive
   static const double _kDesktopBreakpoint = 1024;
   static const double _kSidebarWidth = 260;
-
-  // Marquee notice
-  final String _noticeText =
-      "Special Offer: Get 20% off on all electronics! Limited time only!";
 
   @override
   void initState() {
@@ -104,8 +101,6 @@ class _CategoryPageState extends State<CategoryPage> {
   void _resetPagination() {
     setState(() {
       _currentPage = 0;
-      final total = filteredProducts.length;
-      _hasMoreItems = total > _itemsPerPage;
       _loadingMore = false;
     });
   }
@@ -117,24 +112,28 @@ class _CategoryPageState extends State<CategoryPage> {
     _resetPagination();
   }
 
+  int get _maxPages {
+    if (filteredProducts.isEmpty) return 0;
+    return (filteredProducts.length / _itemsPerPage).ceil();
+  }
+
   List<Product> _getPaginatedProducts() {
-    final start = _currentPage * _itemsPerPage;
-    if (start >= filteredProducts.length) return [];
-    final end = start + _itemsPerPage;
+    if (filteredProducts.isEmpty) return [];
+    final int effectivePage = _currentPage % _maxPages;
+    final int start = effectivePage * _itemsPerPage;
+    final int end = start + _itemsPerPage;
     return end > filteredProducts.length
         ? filteredProducts.sublist(start)
         : filteredProducts.sublist(start, end);
   }
 
   void _loadMoreProducts() {
-    if (_loadingMore || !_hasMoreItems) return;
+    if (_loadingMore || filteredProducts.isEmpty) return;
     setState(() => _loadingMore = true);
     Timer(Duration(milliseconds: 300), () {
       if (mounted) {
         setState(() {
           _currentPage++;
-          final next = _getPaginatedProducts();
-          _hasMoreItems = next.isNotEmpty;
           _loadingMore = false;
         });
       }
@@ -142,20 +141,15 @@ class _CategoryPageState extends State<CategoryPage> {
   }
 
   void _onScroll() {
-    if (!_hasMoreItems) return; // শেষ হলে স্ক্রল লোড করবে না
+    if (filteredProducts.isEmpty) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMoreProducts();
     }
   }
 
-  // SCROLL PHYSICS: শেষ হলে স্ক্রল বন্ধ
+  // SCROLL PHYSICS: Always allow scrolling
   ScrollPhysics _getScrollPhysics() {
-    final displayed = _getPaginatedProducts().length;
-    final total = filteredProducts.length;
-    if (!_hasMoreItems && displayed >= total && total > 0) {
-      return NeverScrollableScrollPhysics();
-    }
     return AlwaysScrollableScrollPhysics();
   }
 
@@ -165,6 +159,7 @@ class _CategoryPageState extends State<CategoryPage> {
         http.get(Uri.parse(categoryUrl)),
         http.get(Uri.parse(productUrl)),
         http.get(Uri.parse(bannerUrl)),
+        http.get(Uri.parse(noticeUrl)),
       ], eagerError: true);
 
       bool success = true;
@@ -199,6 +194,14 @@ class _CategoryPageState extends State<CategoryPage> {
               )
               .toList();
           if (banners.isNotEmpty) await _cacheManager.saveBanners(banners);
+        }
+      } else
+        success = false;
+
+      if (responses[3].statusCode == 200) {
+        final data = json.decode(responses[3].body);
+        if (data is List && data.isNotEmpty) {
+          noticeText = data[0]['title'] ?? '';
         }
       } else
         success = false;
@@ -284,17 +287,19 @@ class _CategoryPageState extends State<CategoryPage> {
                   Expanded(
                     child: Container(
                       height: 30,
-                      child: Marquee(
-                        text: _noticeText,
-                        style: TextStyle(
-                          color: Colors.yellow[100],
-                          fontSize: 14,
-                        ),
-                        scrollAxis: Axis.horizontal,
-                        blankSpace: 100,
-                        velocity: 40,
-                        pauseAfterRound: Duration(seconds: 2),
-                      ),
+                      child: dataLoaded && noticeText.isNotEmpty
+                          ? Marquee(
+                              text: noticeText,
+                              style: TextStyle(
+                                color: Colors.yellow[100],
+                                fontSize: 14,
+                              ),
+                              scrollAxis: Axis.horizontal,
+                              blankSpace: 100,
+                              velocity: 40,
+                              pauseAfterRound: Duration(seconds: 2),
+                            )
+                          : _shimmerMarqueeText(),
                     ),
                   ),
                 ],
@@ -352,6 +357,14 @@ class _CategoryPageState extends State<CategoryPage> {
     );
   }
 
+  Widget _shimmerMarqueeText() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(height: 20, color: Colors.white),
+    );
+  }
+
   // ==================== DESKTOP LAYOUT ====================
   Widget _buildDesktopLayout(List<Product> items, int total) {
     return Row(
@@ -367,14 +380,19 @@ class _CategoryPageState extends State<CategoryPage> {
               ),
               Divider(height: 1),
               Expanded(
-                child: ListView(
-                  children: [
-                    _sidebarTile('All Products', 'all', Icons.store),
-                    ...categories.map(
-                      (c) => _sidebarTile(c.name, c.id, Icons.category),
-                    ),
-                  ],
-                ),
+                child: dataLoaded && categories.isNotEmpty
+                    ? ListView(
+                        children: [
+                          _sidebarTile('All Products', 'all', Icons.store),
+                          ...categories.map(
+                            (c) => _sidebarTile(c.name, c.id, Icons.category),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        itemCount: 8,
+                        itemBuilder: (_, __) => _shimmerSidebarTile(),
+                      ),
               ),
             ],
           ),
@@ -385,7 +403,7 @@ class _CategoryPageState extends State<CategoryPage> {
             child: ListView(
               controller: _scrollController,
               padding: EdgeInsets.all(24),
-              physics: _getScrollPhysics(), // স্ক্রল বন্ধ যখন শেষ
+              physics: _getScrollPhysics(),
               children: [
                 _buildSearchBar(),
                 if (isOffline) _offlineBanner(),
@@ -399,17 +417,6 @@ class _CategoryPageState extends State<CategoryPage> {
                           : _productGrid(items)
                     : _shimmerGrid(),
                 if (_loadingMore) _loader(),
-                if (!_hasMoreItems && total > 0)
-                  Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                        'All $total items loaded',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    ),
-                  ),
-                if (!_hasMoreItems) SizedBox(height: 1),
               ],
             ),
           ),
@@ -444,6 +451,21 @@ class _CategoryPageState extends State<CategoryPage> {
     );
   }
 
+  Widget _shimmerSidebarTile() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: ListTile(
+        leading: Container(width: 24, height: 24, color: Colors.white),
+        title: Container(
+          height: 16,
+          width: double.infinity,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
   // ==================== MOBILE LAYOUT ====================
   Widget _buildMobileLayout(List<Product> items, int total) {
     return RefreshIndicator(
@@ -456,19 +478,26 @@ class _CategoryPageState extends State<CategoryPage> {
           if (!showSearchResults)
             Container(
               height: 56,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                itemCount: categories.length + 1,
-                itemBuilder: (_, i) => i == 0
-                    ? _chip('All', 'all')
-                    : _chip(categories[i - 1].name, categories[i - 1].id),
-              ),
+              child: dataLoaded && categories.isNotEmpty
+                  ? ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: categories.length + 1,
+                      itemBuilder: (_, i) => i == 0
+                          ? _chip('All', 'all')
+                          : _chip(categories[i - 1].name, categories[i - 1].id),
+                    )
+                  : ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: 8,
+                      itemBuilder: (_, __) => _shimmerChip(),
+                    ),
             ),
           Expanded(
             child: ListView(
               controller: _scrollController,
-              physics: _getScrollPhysics(), // স্ক্রল বন্ধ
+              physics: _getScrollPhysics(),
               children: [
                 if (banners.isNotEmpty && !showSearchResults)
                   _bannerSlider(height: 140),
@@ -481,14 +510,6 @@ class _CategoryPageState extends State<CategoryPage> {
                       : _shimmerGrid(),
                 ),
                 if (_loadingMore) _loader(),
-                if (!_hasMoreItems && total > 0)
-                  Center(
-                    child: Text(
-                      'All $total items loaded',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  ),
-                if (!_hasMoreItems) SizedBox(height: 1),
               ],
             ),
           ),
@@ -514,6 +535,24 @@ class _CategoryPageState extends State<CategoryPage> {
             _filterProducts();
           });
         },
+      ),
+    );
+  }
+
+  Widget _shimmerChip() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          height: 32,
+          width: 60,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
     );
   }
@@ -645,23 +684,109 @@ class _CategoryPageState extends State<CategoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                height: imageHeight,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                memCacheHeight:
-                    (imageHeight * MediaQuery.of(context).devicePixelRatio)
-                        .round(),
-                placeholder: (_, __) => _shimmerImage(height: imageHeight),
-                errorWidget: (_, __, ___) => Image.asset(
-                  'assets/images/logo.png',
-                  height: imageHeight,
-                  fit: BoxFit.cover,
+            // Stack for image with floating badges
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    height: imageHeight,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    memCacheHeight:
+                        (imageHeight * MediaQuery.of(context).devicePixelRatio)
+                            .round(),
+                    placeholder: (_, __) => _shimmerImage(height: imageHeight),
+                    errorWidget: (_, __, ___) => Image.asset(
+                      'assets/images/logo.png',
+                      height: imageHeight,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-              ),
+                // Discount badge - top left (only if hasDiscount)
+                if (hasDiscount)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _isDesktop ? 8 : 6,
+                        vertical: _isDesktop ? 4 : 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '-${discount.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: _isDesktop ? 12 : 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                // Rating badge - bottom left
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: _isDesktop ? 8 : 6,
+                      vertical: _isDesktop ? 4 : 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.star,
+                          size: _isDesktop ? 16 : 12,
+                          color: Colors.orange,
+                        ),
+                        SizedBox(width: 2),
+                        Text(
+                          p.rating,
+                          style: TextStyle(
+                            fontSize: _isDesktop ? 12 : 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Stock badge - top right
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: _isDesktop ? 8 : 6,
+                      vertical: _isDesktop ? 3 : 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Stock: ${p.stock}',
+                      style: TextStyle(
+                        fontSize: _isDesktop ? 11 : 9,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 8),
             Text(
@@ -692,25 +817,6 @@ class _CategoryPageState extends State<CategoryPage> {
                 ),
               ],
             ),
-            SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.star, size: 13, color: Colors.orange),
-                Text(' ${p.rating}', style: TextStyle(fontSize: 11)),
-                Spacer(),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Stock: ${p.stock}',
-                    style: TextStyle(fontSize: 10, color: Colors.green[700]),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -735,7 +841,21 @@ class _CategoryPageState extends State<CategoryPage> {
         ),
       );
 
+  Widget _shimmerBadge() => Shimmer.fromColors(
+    baseColor: Colors.grey[300]!,
+    highlightColor: Colors.grey[100]!,
+    child: Container(
+      height: 20,
+      width: 50,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+      ),
+    ),
+  );
+
   Widget _shimmerGrid() {
+    final double shimmerImageHeight = _isDesktop ? 160 : 100;
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -756,7 +876,18 @@ class _CategoryPageState extends State<CategoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _shimmerImage(),
+            // Stack for shimmer image with badge placeholders
+            Stack(
+              children: [
+                _shimmerImage(height: shimmerImageHeight),
+                // Discount placeholder - top left
+                Positioned(top: 8, left: 8, child: _shimmerBadge()),
+                // Rating placeholder - bottom left
+                Positioned(bottom: 8, left: 8, child: _shimmerBadge()),
+                // Stock placeholder - top right
+                Positioned(top: 8, right: 8, child: _shimmerBadge()),
+              ],
+            ),
             SizedBox(height: 8),
             _shimmerText(width: double.infinity, height: 16),
             _shimmerText(width: 80, height: 14),
